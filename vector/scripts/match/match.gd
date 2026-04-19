@@ -68,6 +68,9 @@ var _playfield_base_pos: Vector2 = Vector2.ZERO
 # player's actions count; bot deploys don't tick player quests.
 var _stats_roles_played: Dictionary = {}
 var _stats_squares_destroyed: int = 0
+## True while the tutorial briefing overlay is up — the BUILD countdown
+## freezes so the player can read without the match auto-starting under them.
+var _briefing_active: bool = false
 
 func _ready() -> void:
 	add_to_group("match")
@@ -123,8 +126,10 @@ func _ready() -> void:
 ## Pre-tutorial briefing overlay — displayed on match entry for new players.
 ## Fades in with the callsign header, shows a 3-line ops brief, and dismisses
 ## on tap or after a short auto-hide. Keeps the player from being dropped into
-## controls with no context.
+## controls with no context. Pauses the BUILD countdown while visible so the
+## match can't auto-start under the player while they're reading.
 func _show_tutorial_briefing() -> void:
+	_briefing_active = true
 	var overlay := Control.new()
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -184,6 +189,7 @@ func _show_tutorial_briefing() -> void:
 	var dismiss := func():
 		if not is_instance_valid(overlay) or overlay.is_queued_for_deletion():
 			return
+		_briefing_active = false
 		var fade_out := create_tween()
 		fade_out.tween_property(overlay, "modulate:a", 0.0, 0.2)
 		fade_out.finished.connect(func(): overlay.queue_free())
@@ -350,9 +356,13 @@ func _process(delta: float) -> void:
 	if phase == Phase.OVER:
 		return
 	if phase == Phase.BUILD:
-		_build_time_left -= delta
-		if _build_time_left <= 0.0:
-			_start_match()
+		# Freeze the BUILD countdown while the tutorial briefing overlay is
+		# visible so the player can read without the match starting under
+		# them. Plain matches never set _briefing_active so this is a no-op.
+		if not _briefing_active:
+			_build_time_left -= delta
+			if _build_time_left <= 0.0:
+				_start_match()
 		_refresh_ui()
 		return
 	var cfg := GameConfig.data
@@ -832,8 +842,10 @@ func _update_coach() -> void:
 			coach.point_at(wall_toggle,
 				"TAP THE WALL BUTTON — WALLS SLOW ENEMY UNITS")
 		else:
-			coach.point_at(start_btn,
-				"READY — TAP TO BEGIN THE MATCH")
+			# Match auto-starts at the end of the BUILD countdown — point
+			# the player at the timer instead of the (hidden) START button.
+			coach.point_at(timer_label,
+				"WALLS SET — MATCH AUTO-STARTS WHEN THE TIMER HITS ZERO")
 		return
 	# MATCH / OVERTIME. Once the player lands a hit on the enemy base, stop
 	# coaching — they've got it.

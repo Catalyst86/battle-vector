@@ -69,7 +69,16 @@ func show_result(result: String, you_squares: int, enemy_squares: int, gold_delt
 	elif result == "DRAW":
 		color = Palette.TEXT
 	result_label.add_theme_color_override("font_color", color)
-	score_label.text = "%d VS %d SQUARES" % [you_squares, enemy_squares]
+	# Shrink the hero font when the result string is longer than the
+	# single-word VICTORY / DEFEAT / DRAW set — otherwise "TUTORIAL COMPLETE"
+	# clips the frame.
+	result_label.add_theme_font_size_override("font_size", 28 if result.length() > 8 else 42)
+	# Tutorial runs vs a defenseless dummy; the "X VS Y SQUARES" line is
+	# misleading there. Use a training-specific caption instead.
+	if result == "TUTORIAL COMPLETE":
+		score_label.text = "TRAINING SECTOR CLEARED"
+	else:
+		score_label.text = "%d VS %d SQUARES" % [you_squares, enemy_squares]
 	var gold_txt: String = "+%d" % gold_delta if gold_delta >= 0 else "%d" % gold_delta
 	var trophy_txt: String = ("+%d" % trophy_delta) if trophy_delta >= 0 else ("%d" % trophy_delta)
 	var xp_suffix: String = ""

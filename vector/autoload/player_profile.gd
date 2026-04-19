@@ -294,6 +294,17 @@ func set_screen_shake_enabled(b: bool) -> void:
 	data.screen_shake_enabled = b
 	save()
 
+func set_haptic_enabled(b: bool) -> void:
+	data.haptic_enabled = b
+	save()
+
+## Triggers a short Android phone vibration. No-op on desktop and when the
+## user has haptics disabled. Keep pulses brief — 20–90ms range.
+func buzz(duration_ms: int) -> void:
+	if data == null or not data.haptic_enabled:
+		return
+	Input.vibrate_handheld(duration_ms)
+
 func set_player_name(new_name: String) -> void:
 	var trimmed: String = new_name.strip_edges().substr(0, 16)
 	if trimmed == "":

@@ -112,6 +112,11 @@ func _build_graphics_section() -> Control:
 	var scan_on: bool = PlayerProfile.data.scanlines_enabled if PlayerProfile != null else true
 	vb.add_child(_build_toggle_row("SCANLINES", scan_on,
 		func(b): PlayerProfile.set_scanlines_enabled(b)))
+	var haptic_on: bool = PlayerProfile.data.haptic_enabled if PlayerProfile != null else true
+	vb.add_child(_build_toggle_row("HAPTIC FEEDBACK", haptic_on,
+		func(b):
+			PlayerProfile.set_haptic_enabled(b)
+			if b: PlayerProfile.buzz(30)))  # preview buzz on enable
 	return vb
 
 func _build_account_section() -> Control:

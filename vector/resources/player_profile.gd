@@ -54,3 +54,7 @@ extends Resource
 ## code. Defaults on; players can disable via the settings sheet.
 @export var scanlines_enabled: bool = true
 @export var screen_shake_enabled: bool = true
+## Haptic feedback toggle. When on, PlayerProfile.buzz(ms) drives the phone
+## vibrator on deploy / base-damage / match-end / phase-start events. On
+## desktop this is a no-op — Input.vibrate_handheld only fires on Android.
+@export var haptic_enabled: bool = true

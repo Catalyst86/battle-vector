@@ -440,6 +440,7 @@ func _start_match() -> void:
 	if phase != Phase.BUILD:
 		return
 	SfxBank.play(&"match_start")
+	PlayerProfile.buzz(45)
 	phase = Phase.MATCH
 	_wall_mode = false
 	# Every bot gets its own 3-wall allotment auto-placed on the correct side.
@@ -531,6 +532,7 @@ func _try_deploy(screen: Vector2) -> void:
 	_mana -= float(_selected.cost)
 	var deployed := _selected
 	SfxBank.play_event(deployed, &"deploy")
+	PlayerProfile.buzz(25)
 	_spawn_unit(deployed, world, false)
 	# Daily-ops tracking — player deploys only.
 	if DailyOps != null:
@@ -577,6 +579,10 @@ func _on_unit_reached_base(side: int, world_pos: Vector2, damage: float) -> void
 		_stats_squares_destroyed += hits
 		if DailyOps != null:
 			DailyOps.track(&"destroy_squares", hits)
+	else:
+		# side == 0 = our own base — nudge the player's phone so they feel
+		# the hit even if they're looking elsewhere on screen.
+		PlayerProfile.buzz(55)
 	_check_win()
 	_update_coach()
 
@@ -654,8 +660,19 @@ func _end_match(result: String) -> void:
 		"VICTORY": SfxBank.play(&"victory")
 		"DEFEAT": SfxBank.play(&"defeat")
 		"DRAW": SfxBank.play(&"draw")
+	# Longer buzz on the definitive moment. Defeat gets a slightly harsher
+	# double-pulse via a second buzz shortly after.
+	PlayerProfile.buzz(90)
+	if result == "DEFEAT":
+		get_tree().create_timer(0.18).timeout.connect(func(): PlayerProfile.buzz(60))
+	# Tutorial wins are guaranteed — calling them "VICTORY" feels cheap.
+	# Swap the display string to something honest; reward logic above
+	# already uses the original "VICTORY" so nothing else changes.
+	var display_result: String = result
+	if _mode != null and _mode.is_tutorial and result == "VICTORY":
+		display_result = "TUTORIAL COMPLETE"
 	game_over.show_result(
-		result,
+		display_result,
 		player_base.count_alive(),
 		enemy_base.count_alive(),
 		rewards.get("gold", 0),

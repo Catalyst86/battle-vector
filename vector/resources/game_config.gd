@@ -27,9 +27,9 @@ extends Resource
 @export_group("Match timing")
 @export var match_seconds: int = 180
 @export var overtime_seconds: int = 60
-## Seconds to place walls before the match auto-starts. Players can still
-## tap START MATCH to skip early.
-@export_range(5, 120, 1) var build_seconds: int = 25
+## Seconds to place walls before the match auto-starts. Float so we can
+## tune sub-second timings (e.g. 7.5). Display code ceilings to int.
+@export_range(1.0, 120.0, 0.5) var build_seconds: float = 7.5
 
 @export_group("Mana")
 @export var mana_max: int = 10

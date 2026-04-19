@@ -205,7 +205,11 @@ func _build_timing() -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 14)
 	var cfg := GameConfig.data
-	row.add_child(_time_stat("BUILD", "%ds" % cfg.build_seconds, Palette.UI_CYAN))
+	# BUILD is a float since we tune sub-second timings — format with one
+	# decimal, then trim a trailing ".0" so "7.5s" stays neat but "10s"
+	# doesn't become "10.0s".
+	var build_str: String = ("%.1f" % cfg.build_seconds).trim_suffix(".0") + "s"
+	row.add_child(_time_stat("BUILD", build_str, Palette.UI_CYAN))
 	row.add_child(_time_stat("MATCH", "%dm %ds" % [cfg.match_seconds / 60, cfg.match_seconds % 60], Palette.UI_AMBER))
 	row.add_child(_time_stat("OT", "+%ds" % cfg.overtime_seconds, Palette.UI_RED))
 	return row

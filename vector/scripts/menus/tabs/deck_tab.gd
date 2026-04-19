@@ -18,6 +18,7 @@ var _grid_host: Control
 
 var _press_idx: int = -1
 var _press_pos: Vector2
+var _press_tile: Control = null
 var _press_timer: Timer
 var _long_press_fired: bool = false
 var _context_menu: Control = null
@@ -325,6 +326,7 @@ func _handle_tile_input(event: InputEvent, idx: int, tile: Control) -> void:
 		if mb.pressed:
 			_press_idx = idx
 			_press_pos = mb.position
+			_press_tile = tile
 			_long_press_fired = false
 			_press_timer.start()
 		else:
@@ -339,6 +341,7 @@ func _handle_tile_input(event: InputEvent, idx: int, tile: Control) -> void:
 				_rebuild_grid()
 				_rebuild_detail()
 			_press_idx = -1
+			_press_tile = null
 	elif event is InputEventMouseMotion:
 		# Cancel long-press if the finger drifts past the threshold — that's
 		# the user trying to scroll, not holding to pop the menu.
@@ -362,73 +365,112 @@ func _show_context_menu(idx: int) -> void:
 	if idx < 0 or idx >= cards.size():
 		return
 	var card: CardData = cards[idx]
-	# Full-tab overlay with dim backdrop + centred menu.
+	var tile: Control = _press_tile
+	if tile == null or not is_instance_valid(tile):
+		return
+
+	# Overlay fills the whole tab — backdrop absorbs outside taps. The menu
+	# itself is a small floating panel positioned next to the source tile.
 	var overlay := Control.new()
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	overlay.z_index = 30
 	var backdrop := ColorRect.new()
-	backdrop.color = Color(0.016, 0.027, 0.047, 0.78)
+	backdrop.color = Color(0.016, 0.027, 0.047, 0.5)
 	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
 	backdrop.gui_input.connect(func(e: InputEvent):
 		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
 			_close_context_menu())
 	overlay.add_child(backdrop)
 
+	# Build the floating menu.
 	var panel := PanelContainer.new()
-	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.custom_minimum_size = Vector2(240, 0)
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Palette.UI_BG_1
+	sb.bg_color = Palette.UI_BG_2
 	sb.border_color = Palette.UI_CYAN
 	sb.border_width_top = 1; sb.border_width_bottom = 1
 	sb.border_width_left = 1; sb.border_width_right = 1
 	sb.shadow_color = Palette.UI_CYAN_GLOW
-	sb.shadow_size = 10
+	sb.shadow_size = 14
 	panel.add_theme_stylebox_override("panel", sb)
 	overlay.add_child(panel)
 
-	var m: MarginContainer = TabHelpers.margin(14, 12, 14, 12)
+	var m: MarginContainer = TabHelpers.margin(10, 8, 10, 8)
 	panel.add_child(m)
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 8)
+	col.add_theme_constant_override("separation", 4)
 	m.add_child(col)
 
-	# Header with glyph + name
-	var hdr := HBoxContainer.new()
-	hdr.add_theme_constant_override("separation", 8)
-	col.add_child(hdr)
-	var icon := ShapeIcon.new()
-	icon.shape = card.shape
-	icon.color = card.color
-	icon.icon_size = 14.0
-	icon.custom_minimum_size = Vector2(28, 28)
-	hdr.add_child(icon)
-	var name_lbl: Label = TabHelpers.label(card.display_name.to_upper(), 13, card.color)
+	# Compact header: name only, card-colored. Glyph omitted to save width.
+	var name_lbl: Label = TabHelpers.label(card.display_name.to_upper(), 11, card.color)
 	name_lbl.add_theme_font_override("font", Palette.FONT_DISPLAY_BOLD)
-	name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hdr.add_child(name_lbl)
-	hdr.add_child(TabHelpers.mono(card.role_label(), 9, Palette.UI_TEXT_3))
+	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(name_lbl)
 	col.add_child(TabHelpers.divider(Palette.UI_LINE_2))
 
 	var info_btn: Button = TabHelpers.ghost_button("▸ VIEW INFO", func():
 		_close_context_menu()
 		_show_card_detail(card), Palette.UI_CYAN)
-	info_btn.custom_minimum_size = Vector2(0, 44)
+	info_btn.custom_minimum_size = Vector2(0, 36)
 	col.add_child(info_btn)
-	var remove_btn: Button = TabHelpers.ghost_button("× REMOVE FROM DECK", func():
+	var remove_btn: Button = TabHelpers.ghost_button("× REMOVE", func():
 		_close_context_menu()
 		_remove_from_deck(idx), Palette.UI_RED)
 	remove_btn.add_theme_color_override("font_color", Palette.UI_RED)
-	remove_btn.custom_minimum_size = Vector2(0, 44)
+	remove_btn.custom_minimum_size = Vector2(0, 36)
 	col.add_child(remove_btn)
 
 	add_child(overlay)
 	_context_menu = overlay
-	# Pop-in anim
+
+	# Defer positioning until the panel has measured itself, so we know the
+	# real width/height and can pick the best side.
 	panel.modulate = Color(1, 1, 1, 0)
-	panel.scale = Vector2(0.9, 0.9)
-	panel.pivot_offset = panel.size * 0.5
+	panel.scale = Vector2(0.92, 0.92)
+	_position_context_menu.call_deferred(panel, tile)
+
+func _position_context_menu(panel: PanelContainer, tile: Control) -> void:
+	if panel == null or not is_instance_valid(panel) or tile == null or not is_instance_valid(tile):
+		return
+	var menu_size: Vector2 = panel.get_combined_minimum_size()
+	menu_size.x = maxf(menu_size.x, 150.0)
+	var tile_rect: Rect2 = tile.get_global_rect()
+	var viewport: Vector2 = get_viewport_rect().size
+	var margin: float = 8.0
+	var screen_edge: float = 6.0
+
+	# Prefer right-of-tile, fall back to left, then below, then above —
+	# always staying inside the viewport.
+	var pos := Vector2.ZERO
+	var space_right: float = viewport.x - (tile_rect.position.x + tile_rect.size.x) - screen_edge
+	var space_left: float = tile_rect.position.x - screen_edge
+	var space_below: float = viewport.y - (tile_rect.position.y + tile_rect.size.y) - screen_edge
+	var space_above: float = tile_rect.position.y - screen_edge
+
+	if space_right >= menu_size.x + margin:
+		pos.x = tile_rect.position.x + tile_rect.size.x + margin
+		pos.y = tile_rect.position.y
+	elif space_left >= menu_size.x + margin:
+		pos.x = tile_rect.position.x - menu_size.x - margin
+		pos.y = tile_rect.position.y
+	elif space_below >= menu_size.y + margin:
+		pos.x = tile_rect.position.x + tile_rect.size.x * 0.5 - menu_size.x * 0.5
+		pos.y = tile_rect.position.y + tile_rect.size.y + margin
+	else:
+		pos.x = tile_rect.position.x + tile_rect.size.x * 0.5 - menu_size.x * 0.5
+		pos.y = maxf(screen_edge, tile_rect.position.y - menu_size.y - margin)
+
+	# Clamp both axes so the menu never hangs off an edge.
+	pos.x = clampf(pos.x, screen_edge, viewport.x - menu_size.x - screen_edge)
+	pos.y = clampf(pos.y, screen_edge, viewport.y - menu_size.y - screen_edge)
+
+	# Use anchors 0,0 — position via offset directly on the PanelContainer.
+	panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	panel.offset_left = pos.x
+	panel.offset_top = pos.y
+	panel.offset_right = pos.x + menu_size.x
+	panel.offset_bottom = pos.y + menu_size.y
+	panel.pivot_offset = menu_size * 0.5
 	var tw := create_tween().set_parallel(true)
 	tw.tween_property(panel, "modulate:a", 1.0, 0.14)
 	tw.tween_property(panel, "scale", Vector2.ONE, 0.18).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)

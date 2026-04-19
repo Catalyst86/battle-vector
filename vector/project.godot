@@ -26,6 +26,8 @@ Router="*res://autoload/router.gd"
 PlayerDeck="*res://autoload/player_deck.gd"
 PlayerProfile="*res://autoload/player_profile.gd"
 CurrentMatch="*res://autoload/current_match.gd"
+UnitRegistry="*res://autoload/unit_registry.gd"
+SpawnPool="*res://autoload/spawn_pool.gd"
 
 [display]
 

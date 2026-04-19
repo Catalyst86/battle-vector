@@ -47,6 +47,7 @@ func _ready() -> void:
 	# fast-path: most units never iterate anything when no buffers exist.
 	if card.role == CardData.Role.BUFFER:
 		add_to_group("buffers_enemy" if is_enemy else "buffers_player")
+	UnitRegistry.register(self)
 	# Self-connect reached_base so units spawned by other units (on-death
 	# Revenant → Scout etc.) still hit the match's base-damage handler.
 	var match_node: Node = get_tree().get_first_node_in_group("match")
@@ -54,6 +55,9 @@ func _ready() -> void:
 		if not reached_base.is_connected(match_node._on_unit_reached_base):
 			reached_base.connect(match_node._on_unit_reached_base)
 	queue_redraw()
+
+func _exit_tree() -> void:
+	UnitRegistry.unregister(self)
 
 func spawn_at(pos: Vector2) -> void:
 	world_pos = pos
@@ -82,13 +86,14 @@ func _die() -> void:
 	queue_free()
 
 func _spawn_death_burst() -> void:
-	var b := DEATH_BURST_SCENE.instantiate() as DeathBurst
-	get_parent().add_child(b)
+	var b: DeathBurst = SpawnPool.acquire_burst(get_parent()) as DeathBurst
 	b.setup(world_pos, card.color)
 
 func _spawn_child_unit(c: CardData, pos: Vector2) -> void:
 	if c == null:
 		return
+	# Not pooled — child units are rare (Revenant deaths) and need a fresh
+	# instance with full _ready lifecycle (group registration, signals).
 	var u := UNIT_SCENE.instantiate()
 	u.card = c
 	u.is_enemy = is_enemy
@@ -219,8 +224,7 @@ func _deal_damage(target: Node2D, amount: float) -> void:
 		hp = minf(hp + amount * card.lifesteal_frac, max_hp)
 
 func _apply_aura_heal(delta: float) -> void:
-	var ally_group: String = "player_units" if not is_enemy else "enemy_units"
-	for n in get_tree().get_nodes_in_group(ally_group):
+	for n in UnitRegistry.allies_of(self):
 		if n == self or n.is_queued_for_deletion():
 			continue
 		var u := n as Unit
@@ -232,10 +236,9 @@ func _apply_aura_heal(delta: float) -> void:
 
 func _refresh_effective_damage() -> void:
 	_buff_mult = 1.0
-	# Fast path: only iterate units whose role == BUFFER, via dedicated group.
-	# When no buffers exist on the team, this loop runs over an empty array.
-	var buffer_group: String = "buffers_player" if not is_enemy else "buffers_enemy"
-	for n in get_tree().get_nodes_in_group(buffer_group):
+	# Registry keeps a per-team buffer list so this loop only iterates BUFFER
+	# units — typically 0, occasionally 1–2. O(1) array read per frame.
+	for n in UnitRegistry.buffers_for(self):
 		if n == self or n.is_queued_for_deletion():
 			continue
 		var u := n as Unit
@@ -279,14 +282,13 @@ func _spawn_projectiles(target: Vector2) -> void:
 	var start_angle: float = -spread_rad * float(count - 1) * 0.5
 	for i in count:
 		var dir: Vector2 = base_dir.rotated(start_angle + spread_rad * i)
-		var p := PROJECTILE_SCENE.instantiate() as Projectile
+		var p: Projectile = SpawnPool.acquire_projectile(get_parent()) as Projectile
 		p.world_pos = world_pos
 		p.velocity = dir * cfg.projectile_speed
 		p.damage = effective_damage
 		p.color = card.color
 		p.owner_enemy = is_enemy
 		p.pierces = card.pierces
-		get_parent().add_child(p)
 
 ## Picks a specific alive square from the opposing base for ranged aim.
 ## Returns Vector2.INF if no alive squares remain.
@@ -298,10 +300,9 @@ func _pick_base_square_target() -> Vector2:
 	return base.random_alive_position()
 
 func _find_nearest_enemy(within: float) -> Node2D:
-	var group_name: String = "enemy_units" if not is_enemy else "player_units"
 	var best: Node2D = null
 	var best_d2: float = within * within
-	for n in get_tree().get_nodes_in_group(group_name):
+	for n in UnitRegistry.enemies_of(self):
 		if n.is_queued_for_deletion():
 			continue
 		var u := n as Node2D
@@ -314,10 +315,9 @@ func _find_nearest_enemy(within: float) -> Node2D:
 	return best
 
 func _find_nearest_wounded_ally() -> Unit:
-	var group_name: String = "player_units" if not is_enemy else "enemy_units"
 	var best: Unit = null
 	var best_d2: float = INF
-	for n in get_tree().get_nodes_in_group(group_name):
+	for n in UnitRegistry.allies_of(self):
 		if n == self or n.is_queued_for_deletion():
 			continue
 		var u := n as Unit
@@ -333,8 +333,7 @@ func _find_nearest_wounded_ally() -> Unit:
 	return best
 
 func _aoe_damage(radius: float, dmg: float) -> void:
-	var group_name: String = "enemy_units" if not is_enemy else "player_units"
-	for n in get_tree().get_nodes_in_group(group_name):
+	for n in UnitRegistry.enemies_of(self):
 		if n == self or n.is_queued_for_deletion():
 			continue
 		var u := n as Node2D

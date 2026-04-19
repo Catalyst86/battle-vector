@@ -61,6 +61,9 @@ var _playfield_base_pos: Vector2 = Vector2.ZERO
 
 func _ready() -> void:
 	add_to_group("match")
+	# Defensive: make sure the registry isn't holding refs from a prior match.
+	if UnitRegistry != null:
+		UnitRegistry.clear()
 	_mode = CurrentMatch.get_mode() if CurrentMatch != null else (load(DEFAULT_MODE) as GameMode)
 	# Swap in mode-specific config if present. Restored on exit.
 	if _mode != null and _mode.config != null:

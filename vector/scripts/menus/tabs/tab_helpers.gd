@@ -59,19 +59,16 @@ static func make_panel(bg: Color = Palette.UI_BG_1, border: Color = Palette.UI_L
 ## Wraps any Control in an overlay that draws L-shaped corner brackets on top.
 ## Use this when a panel needs the "operations briefing" look — do NOT nest
 ## Corners directly into a PanelContainer or any Container (their layout
-## engines override anchors).
+## engines override anchors). Uses CornerWrap to correctly forward the
+## inner content's minimum size, so VBoxContainer parents reserve the
+## proper height for the wrapped panel.
 static func with_corners(content: Control, color: Color = Palette.UI_CYAN) -> Control:
-	var root := Control.new()
-	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	root.custom_minimum_size = content.custom_minimum_size
-	# Content fills the wrapper.
-	content.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.add_child(content)
-	# Corners overlay, also fills — they'll self-anchor in _ready.
-	var c := Corners.new()
-	c.color = color
-	root.add_child(c)
-	return root
+	var wrap := CornerWrap.new()
+	# set_content must run after _ready so the Control is valid. Calling
+	# it immediately is fine because it doesn't touch tree-dependent APIs
+	# beyond add_child, which works pre-enter-tree.
+	wrap.set_content(content, color)
+	return wrap
 
 static func margin(left: int = 12, top: int = 12, right: int = 12, bottom: int = 12) -> MarginContainer:
 	var m := MarginContainer.new()

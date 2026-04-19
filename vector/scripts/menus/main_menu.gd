@@ -29,6 +29,15 @@ var _dock: TacticalBottomDock
 var _current_tab: Control = null
 var _active_id: StringName = &"home"
 
+## Ordered list used by swipe cycling + _tabbar both. Keep in sync.
+const TAB_ORDER: Array[StringName] = [&"home", &"collection", &"deck", &"ladder", &"shop"]
+
+## Horizontal-swipe detection — swipes inside the content area cycle tabs.
+var _swipe_start: Vector2 = Vector2.ZERO
+var _swipe_tracking: bool = false
+const SWIPE_THRESHOLD_PX: float = 80.0
+const SWIPE_RATIO: float = 1.5  # |dx| must beat |dy| × ratio to count as horizontal
+
 func _ready() -> void:
 	MusicPlayer.play(&"menu")
 	header.settings_pressed.connect(_open_settings)
@@ -52,6 +61,49 @@ func _ready() -> void:
 	panel_style.border_width_right = 0
 	content.add_theme_stylebox_override("panel", panel_style)
 	_switch_tab(_active_id)
+
+## Global input hook for swipe gestures. Runs before _unhandled_input and
+## doesn't consume events — taps still reach buttons normally, but we get to
+## observe every touch/mouse press + release to measure swipe delta.
+func _input(event: InputEvent) -> void:
+	var pressed: bool = false
+	var pos: Vector2 = Vector2.ZERO
+	if event is InputEventScreenTouch:
+		pressed = (event as InputEventScreenTouch).pressed
+		pos = (event as InputEventScreenTouch).position
+	elif event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.button_index != MOUSE_BUTTON_LEFT:
+			return
+		pressed = mb.pressed
+		pos = mb.position
+	else:
+		return
+	# Only care about gestures that start inside the tab content area.
+	if pressed:
+		if content != null and content.get_global_rect().has_point(pos):
+			_swipe_start = pos
+			_swipe_tracking = true
+		return
+	if not _swipe_tracking:
+		return
+	_swipe_tracking = false
+	var dx: float = pos.x - _swipe_start.x
+	var dy: float = pos.y - _swipe_start.y
+	if absf(dx) < SWIPE_THRESHOLD_PX:
+		return
+	if absf(dx) < absf(dy) * SWIPE_RATIO:
+		return
+	# Swipe right (dx > 0) → previous tab. Swipe left → next tab.
+	_cycle_tab(-1 if dx > 0.0 else 1)
+
+func _cycle_tab(direction: int) -> void:
+	var idx: int = TAB_ORDER.find(_active_id)
+	if idx < 0:
+		return
+	idx = wrapi(idx + direction, 0, TAB_ORDER.size())
+	SfxBank.play_ui(&"ui_click")
+	_switch_tab(TAB_ORDER[idx])
 
 func _switch_tab(id: StringName) -> void:
 	if _current_tab != null and _active_id == id:

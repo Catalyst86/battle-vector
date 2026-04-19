@@ -40,6 +40,23 @@ const MANA_START: float = 6.0
 const MANA_REGEN_PER_SEC: float = 1.0
 ## Delay before the same card can be deployed again, keeps one-card spam at bay.
 const DEPLOY_COOLDOWN: float = 0.4
+## Seconds between bot spawn attempts. Aggression multiplier shortens this
+## per-bot so high-arena opponents flood the board faster.
+const BOT_SPAWN_INTERVAL: float = 2.0
+
+class BotState:
+	var deck_cards: Array[CardData] = []
+	var is_enemy: bool = false
+	var mana: float = 0.0
+	var timer: float = 0.0
+	## Last N roles this bot deployed. Used to avoid spamming the same role.
+	var recent_roles: Array[int] = []
+	## Aggression 0..1 — biases spawn frequency and role preference. Pulled
+	## from the arena's bot persona; higher = faster, more offensive.
+	var aggression: float = 0.75
+	## Roles the persona leans toward — lightly weighted when picking cards.
+	var favour_roles: Array = []
+	var display_name: String = ""
 
 var phase: Phase = Phase.MATCH
 var _time_left: float = MATCH_SECONDS
@@ -50,6 +67,7 @@ var _enemy_gun: Gun
 var _deck: Array[CardData] = []
 var _selected: CardData = null
 var _mana: float = MANA_START
+var _bots: Array[BotState] = []
 
 func _ready() -> void:
 	add_to_group("match")
@@ -66,6 +84,7 @@ func _ready() -> void:
 		Router.goto("res://scenes/match/volley/match_volley.tscn"))
 	_spawn_guns()
 	_setup_hand()
+	_setup_bots()
 	_apply_hud_style()
 	_refresh_hud()
 	SfxBank.play(&"match_start")
@@ -116,6 +135,81 @@ func _setup_hand() -> void:
 	hand.set_interactive(true)
 	hand.card_selected.connect(_on_card_selected)
 	hand.set_affordability(int(_mana))
+
+## Arena-themed persona drives bot deck selection — matches classic so
+## climbing the ladder feels consistent. 2V2 spawns one ally-side bot
+## (is_enemy=false, green-coloured gun) + two enemy bots.
+func _setup_bots() -> void:
+	_bots.clear()
+	var arena_idx: int = PlayerProfile.arena_index() if PlayerProfile != null else 0
+	var enemy_persona: Dictionary = {}
+	var ally_persona: Dictionary = {}
+	if BotPersonas != null:
+		enemy_persona = BotPersonas.for_arena(arena_idx)
+		ally_persona = BotPersonas.for_arena(maxi(0, arena_idx - 1))
+	if _team_size == 1:
+		_bots.append(_make_bot_from_persona(true, enemy_persona))
+	elif _team_size >= 2:
+		_bots.append(_make_bot_from_persona(false, ally_persona))
+		_bots.append(_make_bot_from_persona(true, enemy_persona))
+		_bots.append(_make_bot_from_persona(true, enemy_persona))
+
+## Persona → BotState. Falls back to the player's deck on an empty persona
+## so low-arena matches don't brick. Mirrors match.gd's version.
+func _make_bot_from_persona(enemy: bool, persona: Dictionary) -> BotState:
+	var b := BotState.new()
+	var cards: Array[CardData] = []
+	if BotPersonas != null and not persona.is_empty():
+		cards = BotPersonas.deck_for(persona)
+	if cards.size() < 4:
+		cards = _deck.duplicate() if not _deck.is_empty() else []
+	b.deck_cards = cards
+	b.is_enemy = enemy
+	b.mana = MANA_START
+	b.timer = 0.0
+	b.aggression = float(persona.get("aggression", 0.75))
+	b.favour_roles = persona.get("favour_roles", [])
+	b.display_name = String(persona.get("name", "BOT"))
+	return b
+
+## Bot deploy tick. Picks an affordable card, biases toward recent-role
+## freshness + persona-favoured roles, spawns on the bot's own half.
+func _bot_try_spawn(b: BotState) -> void:
+	if b.deck_cards.is_empty() or phase == Phase.OVER:
+		return
+	var affordable: Array[CardData] = []
+	for c in b.deck_cards:
+		if c != null and c.cost <= int(b.mana):
+			affordable.append(c)
+	if affordable.is_empty():
+		return
+	var fresh: Array[CardData] = []
+	for c in affordable:
+		if not b.recent_roles.has(c.role):
+			fresh.append(c)
+	var candidates: Array[CardData] = fresh if not fresh.is_empty() else affordable
+	if not b.favour_roles.is_empty():
+		var favoured: Array[CardData] = []
+		for c in candidates:
+			if b.favour_roles.has(c.role):
+				favoured.append(c)
+		if not favoured.is_empty():
+			candidates = favoured
+	var pick: CardData = candidates.pick_random()
+	b.recent_roles.append(pick.role)
+	while b.recent_roles.size() > 3:
+		b.recent_roles.pop_front()
+	var x: float = randf_range(40.0, 320.0)
+	var y: float
+	if b.is_enemy:
+		# Enemy spawns on the top half (their own side) so their units walk
+		# down toward the player's gun.
+		y = randf_range(FIELD_TOP + 30.0, MIDLINE_Y - 30.0)
+	else:
+		# Ally bot spawns on the player's half, walks up toward the enemy.
+		y = randf_range(MIDLINE_Y + 30.0, FIELD_BOTTOM - 30.0)
+	b.mana -= float(pick.cost)
+	_spawn_unit(pick, Vector2(x, y), b.is_enemy)
 
 func _gun_positions(count: int, y: float) -> Array:
 	# Single gun sits centre; duo splits left/right of centre.
@@ -174,6 +268,15 @@ func _process(delta: float) -> void:
 		return
 	# Mana regen — matches classic rate so deck-builders transfer feel.
 	_mana = minf(_mana + MANA_REGEN_PER_SEC * delta, float(MANA_MAX))
+	# Bot economies + deploy ticks. Aggression shortens the spawn interval
+	# and boosts regen, matching classic 1V1 pacing.
+	for b in _bots:
+		var aggro_mult: float = 0.7 + 0.6 * clampf(b.aggression, 0.0, 1.0)
+		b.mana = minf(b.mana + MANA_REGEN_PER_SEC * delta * aggro_mult, float(MANA_MAX))
+		b.timer += delta
+		if b.timer >= BOT_SPAWN_INTERVAL / aggro_mult:
+			b.timer = 0.0
+			_bot_try_spawn(b)
 	_time_left -= delta
 	# Escape check — a square that exits the opposing team's side without
 	# being killed credits THIS team. ("Your defenders slipped one past
@@ -351,12 +454,16 @@ func _refresh_hud() -> void:
 		if is_instance_valid(g): e_hp += int(g.hp)
 	player_hp_label.text = "HP %d" % p_hp
 	enemy_hp_label.text = "HP %d" % e_hp
-	# Mana — player's live value + the bot's tracked mana (driven by bot
-	# deploy loop once it lands; for Item 1 this mirrors the player's rate
-	# as a placeholder so the HUD doesn't read 0/10 the whole match).
 	mana_bar.set_value(_mana, MANA_MAX)
 	mana_label.text = "⚡ %d/%d" % [int(_mana), MANA_MAX]
-	enemy_mana_label.text = "⚡ %d/%d" % [int(_mana), MANA_MAX]
+	# Enemy mana reads the first live enemy bot — gives the player a feel for
+	# when the opponent is about to deploy without exposing all bots in 2V2.
+	var enemy_bot_mana: float = 0.0
+	for b in _bots:
+		if b.is_enemy:
+			enemy_bot_mana = b.mana
+			break
+	enemy_mana_label.text = "⚡ %d/%d" % [int(enemy_bot_mana), MANA_MAX]
 	hand.set_affordability(int(_mana))
 	if phase == Phase.OVERTIME:
 		hint_label.text = "▸ OVERTIME — LEAD BY %d TO WIN" % OT_MARGIN

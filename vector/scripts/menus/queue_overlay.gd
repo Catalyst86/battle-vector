@@ -86,7 +86,11 @@ func _launch_match() -> void:
 	var gm: GameMode = load(mode_path) as GameMode
 	if gm != null:
 		CurrentMatch.set_mode(gm)
-	Router.goto("res://scenes/match/match.tscn")
+	# Volley mode loads a different scene tree entirely.
+	var target_scene: String = "res://scenes/match/match.tscn"
+	if gm != null and gm.is_volley:
+		target_scene = "res://scenes/match/volley/match_volley.tscn"
+	Router.goto(target_scene)
 
 func _draw_radar() -> void:
 	var center := Vector2(110, 110)

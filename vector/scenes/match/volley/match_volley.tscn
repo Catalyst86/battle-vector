@@ -1,0 +1,162 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/match/volley/match_volley.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/match/volley/square_spawner.gd" id="2"]
+[ext_resource type="PackedScene" path="res://scenes/match/game_over.tscn" id="3"]
+[ext_resource type="Script" path="res://scripts/ui/tactical/grid_bg.gd" id="4"]
+
+[node name="MatchVolley" type="Node2D"]
+script = ExtResource("1")
+
+[node name="Background" type="ColorRect" parent="."]
+offset_right = 360.0
+offset_bottom = 780.0
+color = Color(0.0156, 0.0275, 0.047, 1)
+mouse_filter = 2
+
+[node name="GridBg" type="Control" parent="."]
+offset_right = 360.0
+offset_bottom = 780.0
+mouse_filter = 2
+script = ExtResource("4")
+spacing = 24.0
+color = Color(0.47, 0.588, 0.706, 0.06)
+
+[node name="Field" type="Node2D" parent="."]
+
+[node name="Midline" type="ColorRect" parent="Field"]
+unique_name_in_owner = true
+offset_left = 30.0
+offset_top = 389.0
+offset_right = 330.0
+offset_bottom = 391.0
+color = Color(0.357, 0.878, 1, 0.2)
+mouse_filter = 2
+
+[node name="SquareSpawner" type="Node2D" parent="Field"]
+script = ExtResource("2")
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="TopStrip" type="PanelContainer" parent="HUD"]
+offset_right = 360.0
+offset_bottom = 64.0
+
+[node name="TopMargin" type="MarginContainer" parent="HUD/TopStrip"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 8
+
+[node name="TopCol" type="VBoxContainer" parent="HUD/TopStrip/TopMargin"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Row1" type="HBoxContainer" parent="HUD/TopStrip/TopMargin/TopCol"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BackButton" type="Button" parent="HUD/TopStrip/TopMargin/TopCol/Row1"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "◂ EXIT"
+
+[node name="Sp1" type="Control" parent="HUD/TopStrip/TopMargin/TopCol/Row1"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="PhaseLabel" type="Label" parent="HUD/TopStrip/TopMargin/TopCol/Row1"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "VOLLEY"
+
+[node name="Sp2" type="Control" parent="HUD/TopStrip/TopMargin/TopCol/Row1"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="TimerLabel" type="Label" parent="HUD/TopStrip/TopMargin/TopCol/Row1"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "2:00"
+
+[node name="Row2" type="HBoxContainer" parent="HUD/TopStrip/TopMargin/TopCol"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="PlayerCol" type="VBoxContainer" parent="HUD/TopStrip/TopMargin/TopCol/Row2"]
+layout_mode = 2
+theme_override_constants/separation = 0
+size_flags_horizontal = 3
+
+[node name="Label" type="Label" parent="HUD/TopStrip/TopMargin/TopCol/Row2/PlayerCol"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.478, 0.541, 0.616, 1)
+theme_override_font_sizes/font_size = 8
+text = "YOU"
+
+[node name="Row" type="HBoxContainer" parent="HUD/TopStrip/TopMargin/TopCol/Row2/PlayerCol"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PlayerScore" type="Label" parent="HUD/TopStrip/TopMargin/TopCol/Row2/PlayerCol/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "0"
+
+[node name="PlayerGunHP" type="Label" parent="HUD/TopStrip/TopMargin/TopCol/Row2/PlayerCol/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_font_sizes/font_size = 10
+text = "HP 100"
+
+[node name="EnemyCol" type="VBoxContainer" parent="HUD/TopStrip/TopMargin/TopCol/Row2"]
+layout_mode = 2
+theme_override_constants/separation = 0
+size_flags_horizontal = 3
+
+[node name="Label" type="Label" parent="HUD/TopStrip/TopMargin/TopCol/Row2/EnemyCol"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.478, 0.541, 0.616, 1)
+theme_override_font_sizes/font_size = 8
+text = "ENEMY"
+horizontal_alignment = 2
+
+[node name="Row" type="HBoxContainer" parent="HUD/TopStrip/TopMargin/TopCol/Row2/EnemyCol"]
+layout_mode = 2
+alignment = 2
+theme_override_constants/separation = 8
+
+[node name="EnemyGunHP" type="Label" parent="HUD/TopStrip/TopMargin/TopCol/Row2/EnemyCol/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_font_sizes/font_size = 10
+text = "HP 100"
+
+[node name="EnemyScore" type="Label" parent="HUD/TopStrip/TopMargin/TopCol/Row2/EnemyCol/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "0"
+
+[node name="HintLabel" type="Label" parent="HUD"]
+unique_name_in_owner = true
+offset_left = 12.0
+offset_top = 720.0
+offset_right = 348.0
+offset_bottom = 740.0
+theme_override_font_sizes/font_size = 10
+text = "▸ AUTO GUN ENGAGED"
+horizontal_alignment = 1
+
+[node name="Overlay" type="CanvasLayer" parent="."]
+layer = 50
+
+[node name="GameOver" parent="Overlay" instance=ExtResource("3")]
+unique_name_in_owner = true

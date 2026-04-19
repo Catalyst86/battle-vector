@@ -1,7 +1,7 @@
 class_name TacticalBottomDock
 extends Control
-## Persistent bottom dock — tutorial (ghost) + 1V1 (primary glowing) + 2V2
-## (secondary). Emits `mode_selected(mode)` for 1v1/2v2 and `tutorial_pressed`.
+## Persistent bottom dock — tutorial (ghost) + 1V1 (primary glowing) + VOLLEY +
+## 2V2. Emits `mode_selected(mode)` for 1v1/2v2/volley and `tutorial_pressed`.
 ## Pulses the primary via corner brackets + cyan border.
 
 signal mode_selected(mode: StringName)
@@ -10,6 +10,7 @@ signal tutorial_pressed
 var _tutorial_btn: Button
 var _1v1_btn: Button
 var _2v2_btn: Button
+var _volley_btn: Button
 var _pulse_t: float = 0.0
 
 func _ready() -> void:
@@ -19,18 +20,21 @@ func _ready() -> void:
 
 func _build() -> void:
 	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 8)
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 6)
 	grid.set_anchors_preset(Control.PRESET_FULL_RECT)
-	grid.offset_left = 12; grid.offset_right = -12
+	grid.offset_left = 10; grid.offset_right = -10
 	grid.offset_top = 12; grid.offset_bottom = -16
 	add_child(grid)
-	# Column stretch ratios: 1 : 1.3 : 1.3
-	_tutorial_btn = _make_dock_button(false, "TUTORIAL", "TRAIN · SOLO", 1.0)
-	_1v1_btn = _make_dock_button(true, "1V1", "SOLO · 2m", 1.3)
-	_2v2_btn = _make_dock_button(false, "2V2", "DUO · 3m", 1.3)
+	# Column stretch — 1V1 still the primary (fat middle); VOLLEY gets
+	# a highlight secondary, TUTORIAL + 2V2 stay compact.
+	_tutorial_btn = _make_dock_button(false, "TRAIN", "TUTORIAL", 1.0)
+	_1v1_btn = _make_dock_button(true, "1V1", "2m · VS", 1.3)
+	_volley_btn = _make_dock_button(false, "VOLLEY", "2m · RAIN", 1.2)
+	_2v2_btn = _make_dock_button(false, "2V2", "3m · DUO", 1.0)
 	grid.add_child(_tutorial_btn)
 	grid.add_child(_1v1_btn)
+	grid.add_child(_volley_btn)
 	grid.add_child(_2v2_btn)
 	_tutorial_btn.pressed.connect(func():
 		SfxBank.play_ui(&"ui_click")
@@ -41,6 +45,9 @@ func _build() -> void:
 	_2v2_btn.pressed.connect(func():
 		SfxBank.play_ui(&"ui_confirm")
 		mode_selected.emit(&"2v2"))
+	_volley_btn.pressed.connect(func():
+		SfxBank.play_ui(&"ui_confirm")
+		mode_selected.emit(&"volley"))
 
 func _make_dock_button(primary: bool, label: String, subtitle: String, stretch: float) -> Button:
 	var b := Button.new()
@@ -52,7 +59,7 @@ func _make_dock_button(primary: bool, label: String, subtitle: String, stretch: 
 	b.text = label + "\n" + subtitle
 	b.clip_text = false
 	b.autowrap_mode = TextServer.AUTOWRAP_OFF
-	b.add_theme_font_size_override("font_size", Palette.FS_HERO if primary else Palette.FS_BUTTON)
+	b.add_theme_font_size_override("font_size", 16 if primary else 11)
 	b.add_theme_color_override("font_color", Palette.UI_CYAN if primary else Palette.UI_TEXT_0)
 	b.add_theme_color_override("font_hover_color", Palette.UI_CYAN if primary else Palette.UI_TEXT_0)
 	# Custom StyleBox per state

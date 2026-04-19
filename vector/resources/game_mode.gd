@@ -19,3 +19,10 @@ extends Resource
 ## hint text guides the player through deploy → damage → win. First victory
 ## flips PlayerProfile.tutorial_completed and grants a small one-time reward.
 @export var is_tutorial: bool = false
+
+## Volley mode — descending-square shooter. Uses a completely different match
+## scene (scenes/match/match_volley.tscn) where the objective is to destroy
+## shared waves of descending squares with an auto-aiming gun while your
+## opponent's deck (units + spells) tries to bring yours down. See
+## design/volley_mode.md for the full spec.
+@export var is_volley: bool = false

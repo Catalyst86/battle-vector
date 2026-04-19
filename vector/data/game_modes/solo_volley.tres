@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="GameMode" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/game_mode.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"pvp_volley"
+display_name = "VOLLEY"
+description = "Shared wave of descending squares. Highest kill count at the buzzer wins."
+team_size = 1
+networked = true
+is_volley = true

@@ -137,6 +137,13 @@ func _on_queue_requested(mode: StringName) -> void:
 	var confirm: Control = MATCH_CONFIRM.instantiate()
 	confirm.set("mode", mode)
 	confirm.connect("confirmed", func(confirmed_mode: StringName):
+		# Volley mode skips the radar queue for now — just route straight
+		# into the match. When networking lands the queue can gate every
+		# mode uniformly.
+		if confirmed_mode == &"volley":
+			CurrentMatch.set_mode(load("res://data/game_modes/solo_volley.tres") as GameMode)
+			Router.goto("res://scenes/match/volley/match_volley.tscn")
+			return
 		var q: Control = QUEUE_OVERLAY.instantiate()
 		q.set("mode", confirmed_mode)
 		_spawn_modal(q))

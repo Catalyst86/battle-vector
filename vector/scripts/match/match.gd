@@ -45,6 +45,12 @@ class BotState:
 	var timer: float = 0.0
 	## Last N roles this bot deployed. Used to avoid spamming the same role.
 	var recent_roles: Array[int] = []
+	## Aggression 0..1 — biases spawn frequency and role preference. Pulled
+	## from the arena's bot persona; higher = faster, more offensive.
+	var aggression: float = 0.75
+	## Roles the persona leans toward — lightly weighted when picking cards.
+	var favour_roles: Array = []
+	var display_name: String = ""
 
 var phase: Phase = Phase.BUILD
 var _mode: GameMode
@@ -106,6 +112,83 @@ func _ready() -> void:
 	_update_coach()
 	_apply_tactical_hud()
 	MusicPlayer.play(&"match", 0.8)
+	if _mode != null and _mode.is_tutorial:
+		_show_tutorial_briefing()
+
+## Pre-tutorial briefing overlay — displayed on match entry for new players.
+## Fades in with the callsign header, shows a 3-line ops brief, and dismisses
+## on tap or after a short auto-hide. Keeps the player from being dropped into
+## controls with no context.
+func _show_tutorial_briefing() -> void:
+	var overlay := Control.new()
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.z_index = 60
+	var hud: Node = get_node_or_null("HUD")
+	if hud:
+		hud.add_child(overlay)
+	else:
+		add_child(overlay)
+	var bg := ColorRect.new()
+	bg.color = Color(0.016, 0.027, 0.047, 0.92)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.add_child(bg)
+	# Content column
+	var vb := VBoxContainer.new()
+	vb.alignment = BoxContainer.ALIGNMENT_CENTER
+	vb.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vb.offset_left = 24; vb.offset_right = -24
+	vb.add_theme_constant_override("separation", 14)
+	overlay.add_child(vb)
+	var kicker := Label.new()
+	kicker.text = "▸ OPS BRIEFING"
+	kicker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	kicker.add_theme_font_override("font", Palette.FONT_DISPLAY)
+	kicker.add_theme_font_size_override("font_size", 10)
+	kicker.add_theme_color_override("font_color", Palette.UI_TEXT_3)
+	vb.add_child(kicker)
+	var title := Label.new()
+	title.text = "TRAINING\nSECTOR · 01"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_override("font", Palette.FONT_DISPLAY_BOLD)
+	title.add_theme_font_size_override("font_size", 28)
+	title.add_theme_color_override("font_color", Palette.UI_CYAN)
+	vb.add_child(title)
+	var body := Label.new()
+	body.text = ("OBJECTIVE — DESTROY THE HOSTILE BASE (RED SQUARES).\n"
+		+ "BUILD — PLACE WALLS TO SLOW INCOMING UNITS.\n"
+		+ "MATCH — SPEND MANA TO DEPLOY CARDS ON YOUR SIDE.\n"
+		+ "FOLLOW THE HIGHLIGHTED PROMPTS.")
+	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_theme_font_override("font", Palette.FONT_MONO)
+	body.add_theme_font_size_override("font_size", 11)
+	body.add_theme_color_override("font_color", Palette.UI_TEXT_1)
+	vb.add_child(body)
+	var hint := Label.new()
+	hint.text = "▸ TAP TO CONTINUE"
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.add_theme_font_override("font", Palette.FONT_DISPLAY)
+	hint.add_theme_font_size_override("font_size", 10)
+	hint.add_theme_color_override("font_color", Palette.UI_AMBER)
+	vb.add_child(hint)
+	# Fade-in, then tap-to-dismiss (or auto-dismiss after 5s).
+	overlay.modulate = Color(1, 1, 1, 0)
+	var fade_in := create_tween()
+	fade_in.tween_property(overlay, "modulate:a", 1.0, 0.3)
+	var dismiss := func():
+		if not is_instance_valid(overlay) or overlay.is_queued_for_deletion():
+			return
+		var fade_out := create_tween()
+		fade_out.tween_property(overlay, "modulate:a", 0.0, 0.2)
+		fade_out.finished.connect(func(): overlay.queue_free())
+	overlay.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			SfxBank.play_ui(&"ui_click")
+			dismiss.call())
+	# Auto-dismiss fallback — don't strand the player on the briefing.
+	var auto_timer := get_tree().create_timer(6.0)
+	auto_timer.timeout.connect(dismiss)
 
 ## Re-skins the existing HUD nodes with the tactical theme — fonts, colors,
 ## and button styleboxes. Done in code rather than .tscn edits so we don't
@@ -124,6 +207,11 @@ func _apply_tactical_hud() -> void:
 	if enemy_lbl:
 		enemy_lbl.add_theme_font_override("font", Palette.FONT_DISPLAY)
 		enemy_lbl.add_theme_color_override("font_color", Palette.UI_RED)
+		# Name after the enemy persona we're fighting.
+		for b in _bots:
+			if b.is_enemy and b.display_name != "":
+				enemy_lbl.text = "ENEMY // %s" % b.display_name
+				break
 	# Bottom HUD ── identity / mana line
 	var player_lbl: Label = $HUD/BottomHUD/PlayerRow/PlayerLabel
 	if player_lbl:
@@ -186,20 +274,22 @@ func _setup_bots() -> void:
 	# Tutorial has no bots — just the player vs a defenseless enemy base.
 	if _mode.is_tutorial:
 		return
-	# Bot decks are random 8-subsets of the unlocked pool so the player doesn't
-	# always face a mirror match. Fallback to the player's deck if nothing else
-	# is available yet (e.g. very low level with <8 unlocked).
-	var pool: Array[CardData] = deck
-	if PlayerProfile != null:
-		var unlocked := PlayerProfile.unlocked_cards()
-		if unlocked.size() >= 4:
-			pool = unlocked
+	# Arena-themed personas drive bot decks. The player's current arena picks
+	# the enemy flavour; ally bots in 2v2 share the same persona for cohesion.
+	var arena_idx: int = PlayerProfile.arena_index() if PlayerProfile != null else 0
+	var enemy_persona: Dictionary = {}
+	var ally_persona: Dictionary = {}
+	if BotPersonas != null:
+		enemy_persona = BotPersonas.for_arena(arena_idx)
+		# Ally bots pull from the player's arena too — same flavour, distinct
+		# persona slot. A second personality table per side could land later.
+		ally_persona = BotPersonas.for_arena(maxi(0, arena_idx - 1))
 	if _mode.team_size == 1:
-		_bots.append(_make_bot(true, _random_subset(pool, 8)))
+		_bots.append(_make_bot_from_persona(true, enemy_persona))
 	elif _mode.team_size >= 2:
-		_bots.append(_make_bot(false, _random_subset(pool, 8)))
-		_bots.append(_make_bot(true, _random_subset(pool, 8)))
-		_bots.append(_make_bot(true, _random_subset(pool, 8)))
+		_bots.append(_make_bot_from_persona(false, ally_persona))
+		_bots.append(_make_bot_from_persona(true, enemy_persona))
+		_bots.append(_make_bot_from_persona(true, enemy_persona))
 
 func _build_tutorial_deck() -> Array[CardData]:
 	var result: Array[CardData] = []
@@ -224,6 +314,27 @@ func _make_bot(enemy: bool, bot_deck: Array[CardData]) -> BotState:
 	b.timer = 0.0
 	return b
 
+## Builds a bot from a persona dictionary. Defensive against missing fields
+## so a partial persona (or empty dict on low arenas) still spawns a valid
+## bot — falls back to the player's current deck in that case.
+func _make_bot_from_persona(enemy: bool, persona: Dictionary) -> BotState:
+	var b := BotState.new()
+	var cards: Array[CardData] = []
+	if BotPersonas != null and not persona.is_empty():
+		cards = BotPersonas.deck_for(persona)
+	if cards.size() < 4:
+		# Fallback — use the player's deck so matches can't brick at low arenas.
+		cards = deck if not deck.is_empty() else _random_subset(
+			PlayerProfile.unlocked_cards() if PlayerProfile != null else deck, 8)
+	b.deck_cards = cards
+	b.is_enemy = enemy
+	b.mana = float(GameConfig.data.mana_start)
+	b.timer = 0.0
+	b.aggression = float(persona.get("aggression", 0.75))
+	b.favour_roles = persona.get("favour_roles", [])
+	b.display_name = String(persona.get("name", "BOT"))
+	return b
+
 func _process(delta: float) -> void:
 	_update_shake(delta)
 	if phase == Phase.OVER:
@@ -237,9 +348,11 @@ func _process(delta: float) -> void:
 	var cfg := GameConfig.data
 	_mana = minf(_mana + cfg.mana_regen_per_sec * delta, float(cfg.mana_max))
 	for b in _bots:
-		b.mana = minf(b.mana + cfg.mana_regen_per_sec * delta, float(cfg.mana_max))
+		# Aggressive personas regenerate + act faster. Multiplier range 0.7–1.3.
+		var aggro_mult: float = 0.7 + 0.6 * clampf(b.aggression, 0.0, 1.0)
+		b.mana = minf(b.mana + cfg.mana_regen_per_sec * delta * aggro_mult, float(cfg.mana_max))
 		b.timer += delta
-		if b.timer >= bot_spawn_interval:
+		if b.timer >= bot_spawn_interval / aggro_mult:
 			b.timer = 0.0
 			_bot_try_spawn(b)
 	_time_left -= delta
@@ -547,14 +660,23 @@ func _bot_try_spawn(b: BotState) -> void:
 			affordable.append(c)
 	if affordable.is_empty():
 		return
-	# Prefer cards whose role isn't in recent history — stops the bot
-	# from firing off three Darts in a row. Falls back to any affordable
-	# if every role was used recently.
+	# Prefer cards whose role isn't in recent history, AND lean toward the
+	# persona's favoured roles. Fresh-role set filters by "haven't used in
+	# the last 3"; favoured set further prefers cards the persona leans
+	# toward. Falls back to the lower-priority sets when they come up empty.
 	var fresh: Array[CardData] = []
 	for c in affordable:
 		if not b.recent_roles.has(c.role):
 			fresh.append(c)
-	var pick: CardData = fresh.pick_random() if not fresh.is_empty() else affordable.pick_random()
+	var candidates: Array[CardData] = fresh if not fresh.is_empty() else affordable
+	if not b.favour_roles.is_empty():
+		var favoured: Array[CardData] = []
+		for c in candidates:
+			if b.favour_roles.has(c.role):
+				favoured.append(c)
+		if not favoured.is_empty():
+			candidates = favoured
+	var pick: CardData = candidates.pick_random()
 	b.recent_roles.append(pick.role)
 	while b.recent_roles.size() > 3:
 		b.recent_roles.pop_front()
@@ -672,8 +794,10 @@ func _tutorial_hint() -> void:
 	else:
 		hint_label.text = "TAP A CARD TO DEPLOY YOUR FIRST UNIT"
 
-## Tutorial visual coach. Highlights the next thing the player should tap.
-## State-derived so it always reflects the current situation — no step counter.
+## Tutorial visual coach. Highlights the next thing the player should tap and
+## displays a one-line message bubble next to it. State-derived so every frame
+## the coach is showing the right hint for the current moment — no step
+## counter to keep in sync.
 func _update_coach() -> void:
 	if _mode == null or not _mode.is_tutorial:
 		coach.hide_coach()
@@ -683,11 +807,14 @@ func _update_coach() -> void:
 		return
 	if phase == Phase.BUILD:
 		if _wall_mode:
-			coach.point_at_rect(_player_deploy_screen_rect())
+			coach.point_at_rect(_player_deploy_screen_rect(),
+				"TAP YOUR (BLUE) SIDE TO DROP A WALL — BLOCK THE LANES")
 		elif _player_wall_count == 0:
-			coach.point_at(wall_toggle)
+			coach.point_at(wall_toggle,
+				"TAP THE WALL BUTTON — WALLS SLOW ENEMY UNITS")
 		else:
-			coach.point_at(start_btn)
+			coach.point_at(start_btn,
+				"READY — TAP TO BEGIN THE MATCH")
 		return
 	# MATCH / OVERTIME. Once the player lands a hit on the enemy base, stop
 	# coaching — they've got it.
@@ -696,9 +823,11 @@ func _update_coach() -> void:
 		return
 	if _selected == null:
 		var btn: Control = hand.first_button()
-		coach.point_at(btn if btn != null else hand)
+		coach.point_at(btn if btn != null else hand,
+			"PICK A CARD — EACH ONE COSTS MANA TO DEPLOY")
 	else:
-		coach.point_at_rect(_player_deploy_screen_rect())
+		coach.point_at_rect(_player_deploy_screen_rect(),
+			"TAP YOUR SIDE TO DEPLOY — DESTROY EVERY RED SQUARE TO WIN")
 
 ## Screen-space rect covering the player's half of the projected trapezoid.
 ## Used by the coach to circle the deploy zone.

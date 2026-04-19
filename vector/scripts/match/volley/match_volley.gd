@@ -438,6 +438,7 @@ func _end_match() -> void:
 		rewards.get("trophies", 0),
 		rewards.get("xp", 0),
 		rewards.get("levels", 0),
+		"%d VS %d KILLS" % [_player_score, _enemy_score],
 	)
 
 func _refresh_hud() -> void:

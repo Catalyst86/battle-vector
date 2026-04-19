@@ -61,7 +61,7 @@ func _style_button(b: Button, primary: bool) -> void:
 	for sn in ["normal", "hover", "pressed", "focus"]:
 		b.add_theme_stylebox_override(sn, sb)
 
-func show_result(result: String, you_squares: int, enemy_squares: int, gold_delta: int = 0, trophy_delta: int = 0, xp_delta: int = 0, levels_gained: int = 0) -> void:
+func show_result(result: String, you_squares: int, enemy_squares: int, gold_delta: int = 0, trophy_delta: int = 0, xp_delta: int = 0, levels_gained: int = 0, subtitle_override: String = "") -> void:
 	result_label.text = result
 	var color: Color = Palette.BASE_YOU
 	if result == "DEFEAT":
@@ -73,9 +73,13 @@ func show_result(result: String, you_squares: int, enemy_squares: int, gold_delt
 	# single-word VICTORY / DEFEAT / DRAW set — otherwise "TUTORIAL COMPLETE"
 	# clips the frame.
 	result_label.add_theme_font_size_override("font_size", 28 if result.length() > 8 else 42)
+	# Explicit subtitle wins over the score-line default. Volley uses it to
+	# render "X VS Y KILLS" since the SQUARES wording doesn't match the mode.
+	if subtitle_override != "":
+		score_label.text = subtitle_override
 	# Tutorial runs vs a defenseless dummy; the "X VS Y SQUARES" line is
 	# misleading there. Use a training-specific caption instead.
-	if result == "TUTORIAL COMPLETE":
+	elif result == "TUTORIAL COMPLETE":
 		score_label.text = "TRAINING SECTOR CLEARED"
 	else:
 		score_label.text = "%d VS %d SQUARES" % [you_squares, enemy_squares]

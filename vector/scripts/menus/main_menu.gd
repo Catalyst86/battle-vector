@@ -6,6 +6,7 @@ extends Control
 
 const SETTINGS_MODAL := preload("res://scenes/menus/settings_modal.tscn")
 const QUEUE_OVERLAY := preload("res://scenes/menus/queue_overlay.tscn")
+const MATCH_CONFIRM := preload("res://scenes/menus/match_confirm.tscn")
 
 ## Per-tab scene/script map. Each value is a script; we instantiate it as a
 ## Control and add it to the Content panel when its tab becomes active.
@@ -79,9 +80,15 @@ func _open_settings() -> void:
 	_spawn_modal(SETTINGS_MODAL.instantiate())
 
 func _on_queue_requested(mode: StringName) -> void:
-	var q: Control = QUEUE_OVERLAY.instantiate()
-	q.set("mode", mode)
-	_spawn_modal(q)
+	# Insert the briefing confirmation between the bottom-dock tap and the
+	# matchmaking radar. Player can CANCEL to back out or DEPLOY to queue up.
+	var confirm: Control = MATCH_CONFIRM.instantiate()
+	confirm.set("mode", mode)
+	confirm.connect("confirmed", func(confirmed_mode: StringName):
+		var q: Control = QUEUE_OVERLAY.instantiate()
+		q.set("mode", confirmed_mode)
+		_spawn_modal(q))
+	_spawn_modal(confirm)
 
 func _on_tutorial() -> void:
 	CurrentMatch.set_mode(load("res://data/game_modes/tutorial.tres") as GameMode)

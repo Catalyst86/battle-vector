@@ -104,7 +104,12 @@ func _ready() -> void:
 	enemy_base.squares_changed.connect(func(_n): _check_win())
 	player_base.squares_changed.connect(func(_n): _check_win())
 	wall_toggle.pressed.connect(_on_wall_toggle)
+	# START MATCH button is deprecated — match auto-starts when the BUILD
+	# countdown hits zero. The button is hidden in _apply_tactical_hud to
+	# keep the UI honest; the _start_match callback stays connected as a
+	# harmless no-op if something tries to fire it.
 	start_btn.pressed.connect(_start_match)
+	start_btn.visible = false
 	phase_label.text = "SETUP"
 	_setup_bots()
 	_refresh_ui()
@@ -754,6 +759,15 @@ func _refresh_ui() -> void:
 		phase_label.text = "SETUP"
 		var build_secs: int = maxi(0, int(ceil(_build_time_left)))
 		timer_label.text = "0:%02d" % build_secs
+		# Flash the timer red in the final 5 seconds so the player feels
+		# the clock — the match is about to auto-start and they'd better
+		# have walls down.
+		if _build_time_left <= 5.0:
+			var pulse: float = 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.012)
+			timer_label.add_theme_color_override("font_color",
+				Palette.UI_AMBER.lerp(Palette.UI_RED, pulse))
+		else:
+			timer_label.add_theme_color_override("font_color", Palette.UI_AMBER)
 	else:
 		var total_secs: int = maxi(0, int(ceil(_time_left)))
 		timer_label.text = "%d:%02d" % [total_secs / 60, total_secs % 60]

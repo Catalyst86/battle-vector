@@ -90,7 +90,7 @@ func _build_arena_hero() -> Control:
 	title_row.add_child(TabHelpers.mono("LVL %d" % (PlayerProfile.data.player_level if PlayerProfile != null else 1), 10, Palette.UI_TEXT_3))
 
 	vb.add_child(TabHelpers.label(arena_name, 14, Palette.UI_TEXT_0))
-	var desc: Label = TabHelpers.mono("Low-density perimeter. Open sight lines — favour shooters.", 10, Palette.UI_TEXT_2)
+	var desc: Label = TabHelpers.mono(_arena_flavor(arena_idx - 1), 10, Palette.UI_TEXT_2)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc.custom_minimum_size = Vector2(0, 0)
 	vb.add_child(desc)
@@ -101,6 +101,23 @@ func _build_arena_hero() -> Control:
 	chip_row.add_child(_make_status_chip("OPEN", Palette.UI_CYAN))
 	chip_row.add_child(_make_status_chip("3 MINS", Palette.UI_AMBER))
 	return panel
+
+## One-line flavor blurb for each arena. Keyed by 0-based arena index.
+## Kept here (not on PlayerProfile) so the Home tab owns presentation copy.
+func _arena_flavor(arena_idx: int) -> String:
+	var lines := [
+		"Low-density perimeter. Open sight lines — favour shooters.",
+		"Ground-up brawler zone. Expect heavy melee rushes.",
+		"Neon arc. Swarm tactics thrive in the cross-fire lanes.",
+		"Void halls. Long corridors — bring interceptors and snipers.",
+		"Datavault mainframe. Sniper duels and buff auras rule.",
+		"Signal peak. Aggressive meta, fast mana cycles.",
+		"Storm layer. Swarm + healer combos out-attrition the field.",
+		"Apex grid. Endgame legends only — no second chances.",
+	]
+	if arena_idx < 0 or arena_idx >= lines.size():
+		return lines[0]
+	return lines[arena_idx]
 
 func _make_status_chip(text: String, dot_color: Color) -> Control:
 	var p := PanelContainer.new()

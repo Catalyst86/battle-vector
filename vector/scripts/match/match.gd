@@ -207,11 +207,16 @@ func _apply_tactical_hud() -> void:
 	if enemy_lbl:
 		enemy_lbl.add_theme_font_override("font", Palette.FONT_DISPLAY)
 		enemy_lbl.add_theme_color_override("font_color", Palette.UI_RED)
-		# Name after the enemy persona we're fighting.
-		for b in _bots:
-			if b.is_enemy and b.display_name != "":
-				enemy_lbl.text = "ENEMY // %s" % b.display_name
-				break
+		# Name after the enemy persona. Tutorial mode has no bots, so we
+		# label the training dummy explicitly instead of leaving the tscn
+		# default "K.VOID_07" hardcoded placeholder visible.
+		if _mode != null and _mode.is_tutorial:
+			enemy_lbl.text = "TARGET // TRAINING DUMMY"
+		else:
+			for b in _bots:
+				if b.is_enemy and b.display_name != "":
+					enemy_lbl.text = "ENEMY // %s" % b.display_name
+					break
 	# Bottom HUD ── identity / mana line
 	var player_lbl: Label = $HUD/BottomHUD/PlayerRow/PlayerLabel
 	if player_lbl:

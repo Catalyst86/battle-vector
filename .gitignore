@@ -14,11 +14,13 @@ vector/.godot/
 # --- Build outputs ---------------------------------------------------------
 /builds/
 /exports/
+vector/builds/
 *.apk
 *.aab
 *.ipa
 *.pck
 *.zip
+*.idsig
 
 # --- OS noise --------------------------------------------------------------
 .DS_Store

@@ -83,7 +83,7 @@ func _check_collisions(cfg: GameConfigData) -> void:
 				return
 	# 2) Opposing units (body * 0.8 radius). Registry gives us a per-team array
 	#    reference — no allocation per projectile per frame.
-	for n in UnitRegistry.enemies_of(self):
+	for n in UnitRegistry.enemies_of(owner_enemy):
 		if n.is_queued_for_deletion():
 			continue
 		var id: int = n.get_instance_id()

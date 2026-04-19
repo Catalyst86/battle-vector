@@ -79,21 +79,29 @@ func random_alive_position() -> Vector2:
 		return Vector2.INF
 	return _cell_world_center(alive_idx[randi() % alive_idx.size()], GameConfig.data)
 
-## Precise hit test: `world_pos` must lie inside an alive square's rect. This
-## is what projectiles use so they can MISS if they land in a gap or on a
-## dead square. Returns squares killed (0 = miss). If `hits > 1`, the hit
-## cascades to the nearest alive neighbours from the initial impact.
+## Column-aware hit test. Finds the first alive cell in the impact column,
+## walking from the row the projectile meets first toward the back of the
+## strip — so a shot passing through a dead front-row square still damages
+## the row behind it. Returns squares killed (0 = impact column is fully
+## dead or off-grid). If `hits > 1`, the hit cascades to nearest alive
+## neighbours from the initial impact.
 func hit_at(world_pos: Vector2, hits: int) -> int:
 	var cfg := GameConfig.data
 	var cell_w: float = cfg.map_width / float(_cols)
-	var cell_h: float = cfg.base_strip_height / float(_rows)
-	var strip_top: float = 0.0 if side == SIDE_ENEMY else (cfg.map_height - cfg.base_strip_height)
 	var col: int = int(floor(world_pos.x / cell_w))
-	var row: int = int(floor((world_pos.y - strip_top) / cell_h))
-	if col < 0 or col >= _cols or row < 0 or row >= _rows:
+	if col < 0 or col >= _cols:
 		return 0
-	var idx: int = row * _cols + col
-	if not alive[idx]:
+	# Projectile traversal order: for the enemy base, rounds come from below
+	# so the near row is rows-1; for the player base, from above so row 0
+	# is near. Walk the column in that order and hit the first alive cell.
+	var idx: int = -1
+	var row_range: Array = range(_rows - 1, -1, -1) if side == SIDE_ENEMY else range(_rows)
+	for r in row_range:
+		var candidate: int = r * _cols + col
+		if alive[candidate]:
+			idx = candidate
+			break
+	if idx < 0:
 		return 0
 	alive[idx] = false
 	var killed: int = 1

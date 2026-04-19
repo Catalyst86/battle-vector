@@ -25,6 +25,9 @@ enum Shape { TRIANGLE, SQUARE, DIAMOND, CIRCLE, RING, STAR, CHEVRON, SPIRAL }
 @export_multiline var description: String = ""
 ## Player level required to own/play this card. Default 1 = always available.
 @export_range(1, 20) var unlock_level: int = 1
+## Rarity tier. Drives UI treatment (LED color, border, shop filtering).
+## Values: &"common" / &"rare" / &"epic" / &"legend".
+@export var rarity: StringName = &"common"
 
 @export_group("Combat")
 @export_range(1, 10) var cost: int = 2
@@ -71,6 +74,14 @@ enum Shape { TRIANGLE, SQUARE, DIAMOND, CIRCLE, RING, STAR, CHEVRON, SPIRAL }
 @export_range(0.0, 200.0, 1.0) var on_death_shockwave_radius: float = 0.0
 ## Damage dealt to enemies inside the shockwave radius.
 @export_range(0.0, 200.0, 0.5) var on_death_shockwave_damage: float = 0.0
+
+@export_group("Audio (optional overrides)")
+## SFX ids that override the role-derived defaults. Empty = use role default.
+## Valid ids are whatever SfxBank has synthesised (see SfxBank._build_bank).
+@export var sfx_deploy: StringName = &""
+@export var sfx_shoot: StringName = &""
+@export var sfx_death: StringName = &""
+@export var sfx_hit: StringName = &""
 
 func role_label() -> String:
 	match role:

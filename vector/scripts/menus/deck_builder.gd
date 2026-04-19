@@ -18,10 +18,49 @@ var _pool_buttons: Array[CardButton] = []
 func _ready() -> void:
 	_deck = PlayerDeck.cards.duplicate()
 	save_btn.pressed.connect(_on_save)
-	back_btn.pressed.connect(func(): Router.goto("res://scenes/menus/main_menu.tscn"))
+	back_btn.pressed.connect(func():
+		SfxBank.play_ui(&"ui_back")
+		Router.goto("res://scenes/menus/main_menu.tscn"))
+	_apply_tactical_style()
 	_build_slots()
 	_build_pool()
 	_refresh()
+
+## Apply the tactical theme to the legacy deck-builder scene without restructuring
+## its nodes. Re-skins the title, counters, pool caption, and buttons.
+func _apply_tactical_style() -> void:
+	var bg: ColorRect = $Background
+	if bg: bg.color = Palette.UI_BG_0
+	var title: Label = $Title
+	if title:
+		title.add_theme_font_override("font", Palette.FONT_DISPLAY_BOLD)
+		title.add_theme_color_override("font_color", Palette.UI_CYAN)
+		title.text = "EDIT LOADOUT"
+	count_label.add_theme_font_override("font", Palette.FONT_DISPLAY)
+	count_label.add_theme_color_override("font_color", Palette.UI_TEXT_2)
+	var pool_caption: Label = $PoolCaption
+	if pool_caption:
+		pool_caption.add_theme_font_override("font", Palette.FONT_DISPLAY)
+		pool_caption.add_theme_color_override("font_color", Palette.UI_TEXT_3)
+	_style_button(save_btn, true)
+	_style_button(back_btn, false)
+
+func _style_button(b: Button, primary: bool) -> void:
+	b.add_theme_font_override("font", Palette.FONT_DISPLAY_BOLD)
+	b.add_theme_font_size_override("font_size", 11)
+	var color: Color = Palette.UI_CYAN if primary else Palette.UI_TEXT_1
+	b.add_theme_color_override("font_color", color)
+	b.add_theme_color_override("font_disabled_color", Palette.UI_TEXT_3)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color("0e2533") if primary else Palette.UI_BG_1
+	sb.border_color = Palette.UI_CYAN if primary else Palette.UI_LINE_3
+	sb.border_width_top = 1; sb.border_width_bottom = 1
+	sb.border_width_left = 1; sb.border_width_right = 1
+	if primary:
+		sb.shadow_color = Palette.UI_CYAN_GLOW
+		sb.shadow_size = 6
+	for sn in ["normal", "hover", "pressed", "focus", "disabled"]:
+		b.add_theme_stylebox_override(sn, sb)
 
 func _build_slots() -> void:
 	for c in slots_row.get_children():
@@ -65,6 +104,7 @@ func _on_slot_pressed(slot_index: int) -> void:
 func _on_save() -> void:
 	if _deck.size() < DECK_SIZE:
 		return
+	SfxBank.play_ui(&"ui_confirm")
 	PlayerDeck.save_deck(_deck)
 	Router.goto("res://scenes/menus/main_menu.tscn")
 

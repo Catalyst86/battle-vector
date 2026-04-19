@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1")
 id = &"chevron"
+rarity = &"rare"
 display_name = "Chevron"
 shape = 6
 role = 5

@@ -58,10 +58,16 @@ var _player_wall_count: int = 0
 var _bots: Array[BotState] = []
 var _shake: float = 0.0
 var _playfield_base_pos: Vector2 = Vector2.ZERO
+# Per-match stat accumulators — flushed to DailyOps on _end_match. Only the
+# player's actions count; bot deploys don't tick player quests.
+var _stats_roles_played: Dictionary = {}
+var _stats_squares_destroyed: int = 0
 
 func _ready() -> void:
 	add_to_group("match")
-	# Defensive: make sure the registry isn't holding refs from a prior match.
+	# Defensive: clear stale state from a prior match. Pause persists across
+	# scene loads, so a rematch after VICTORY would start frozen without this.
+	get_tree().paused = false
 	if UnitRegistry != null:
 		UnitRegistry.clear()
 	_mode = CurrentMatch.get_mode() if CurrentMatch != null else (load(DEFAULT_MODE) as GameMode)
@@ -85,7 +91,9 @@ func _ready() -> void:
 	hand.build()
 	hand.set_interactive(false)
 	hand.card_selected.connect(_on_card_selected)
-	back_btn.pressed.connect(func(): _return_to_home())
+	back_btn.pressed.connect(func():
+		SfxBank.play_ui(&"ui_back")
+		_return_to_home())
 	game_over.rematch_requested.connect(func(): _return_to_match())
 	enemy_base.squares_changed.connect(func(_n): _check_win())
 	player_base.squares_changed.connect(func(_n): _check_win())
@@ -96,6 +104,62 @@ func _ready() -> void:
 	_refresh_ui()
 	_update_hint()
 	_update_coach()
+	_apply_tactical_hud()
+	MusicPlayer.play(&"match", 0.8)
+
+## Re-skins the existing HUD nodes with the tactical theme — fonts, colors,
+## and button styleboxes. Done in code rather than .tscn edits so we don't
+## disturb the scene's anchors / unique-name wiring.
+func _apply_tactical_hud() -> void:
+	# Top HUD ── phase label becomes a bordered cyan pill.
+	phase_label.add_theme_font_override("font", Palette.FONT_DISPLAY_BOLD)
+	phase_label.add_theme_font_size_override("font_size", 11)
+	phase_label.add_theme_color_override("font_color", Palette.UI_CYAN)
+	timer_label.add_theme_font_override("font", Palette.FONT_MONO_BOLD)
+	timer_label.add_theme_font_size_override("font_size", 18)
+	timer_label.add_theme_color_override("font_color", Palette.UI_AMBER)
+	enemy_mana_label.add_theme_font_override("font", Palette.FONT_MONO_BOLD)
+	enemy_mana_label.add_theme_color_override("font_color", Palette.UI_RED)
+	var enemy_lbl: Label = $HUD/TopHUD/EnemyLabel
+	if enemy_lbl:
+		enemy_lbl.add_theme_font_override("font", Palette.FONT_DISPLAY)
+		enemy_lbl.add_theme_color_override("font_color", Palette.UI_RED)
+	# Bottom HUD ── identity / mana line
+	var player_lbl: Label = $HUD/BottomHUD/PlayerRow/PlayerLabel
+	if player_lbl:
+		player_lbl.add_theme_font_override("font", Palette.FONT_DISPLAY)
+		player_lbl.add_theme_color_override("font_color", Palette.UI_CYAN)
+	mana_label.add_theme_font_override("font", Palette.FONT_MONO_BOLD)
+	mana_label.add_theme_color_override("font_color", Palette.UI_CYAN)
+	# Mana pips — swap gold for cyan to match the tactical "friendly" palette.
+	if mana_bar is ManaBar:
+		(mana_bar as ManaBar).pip_color = Palette.UI_CYAN
+		(mana_bar as ManaBar).dim_color = Palette.UI_LINE_2
+		mana_bar.queue_redraw()
+	hint_label.add_theme_font_override("font", Palette.FONT_MONO)
+	hint_label.add_theme_color_override("font_color", Palette.UI_CYAN)
+	# Buttons
+	_style_hud_button(wall_toggle, Palette.UI_TEXT_0)
+	_style_hud_button(back_btn, Palette.UI_TEXT_1)
+	_style_hud_button(start_btn, Palette.UI_CYAN)
+
+func _style_hud_button(b: Button, text_color: Color) -> void:
+	if b == null:
+		return
+	b.add_theme_font_override("font", Palette.FONT_DISPLAY)
+	b.add_theme_font_size_override("font_size", 10)
+	b.add_theme_color_override("font_color", text_color)
+	b.add_theme_color_override("font_hover_color", text_color.lightened(0.2))
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Palette.UI_BG_1
+	sb.border_color = Palette.UI_LINE_3 if text_color != Palette.UI_CYAN else Palette.UI_CYAN
+	sb.border_width_top = 1; sb.border_width_bottom = 1
+	sb.border_width_left = 1; sb.border_width_right = 1
+	if text_color == Palette.UI_CYAN:
+		sb.shadow_color = Palette.UI_CYAN_GLOW
+		sb.shadow_size = 4
+	for sn in ["normal", "hover", "pressed", "focus", "disabled"]:
+		b.add_theme_stylebox_override(sn, sb)
 
 func _exit_tree() -> void:
 	if _original_config != null:
@@ -105,12 +169,14 @@ func _return_to_home() -> void:
 	if _original_config != null:
 		GameConfig.data = _original_config
 		_original_config = null
+	get_tree().paused = false
 	Router.goto("res://scenes/menus/main_menu.tscn")
 
 func _return_to_match() -> void:
 	if _original_config != null:
 		GameConfig.data = _original_config
 		_original_config = null
+	get_tree().paused = false
 	Router.goto(MATCH_SCENE_PATH)
 
 func _setup_bots() -> void:
@@ -229,6 +295,7 @@ func _try_place_wall(screen: Vector2) -> void:
 		return
 	var clamp_x: float = clampf(world.x, cfg.wall_width * 0.5, cfg.map_width - cfg.wall_width * 0.5)
 	_spawn_wall(Vector2(clamp_x, world.y), 0)
+	SfxBank.play(&"wall_place")
 	_player_wall_count += 1
 	if _player_wall_count >= cfg.max_walls_per_player:
 		_wall_mode = false
@@ -239,6 +306,7 @@ func _try_place_wall(screen: Vector2) -> void:
 func _start_match() -> void:
 	if phase != Phase.BUILD:
 		return
+	SfxBank.play(&"match_start")
 	phase = Phase.MATCH
 	_wall_mode = false
 	# Every bot gets its own 3-wall allotment auto-placed on the correct side.
@@ -251,6 +319,45 @@ func _start_match() -> void:
 	_refresh_ui()
 	_update_hint()
 	_update_coach()
+	_show_match_start_countdown()
+
+## Drops a full-screen "3 · 2 · 1 · GO" overlay after BUILD ends — gives the
+## player a beat to orient before bot units start pouring in.
+func _show_match_start_countdown() -> void:
+	var overlay := Control.new()
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.z_index = 50
+	# Find a CanvasLayer to parent into so the overlay sits above the playfield.
+	var hud: Node = get_node_or_null("HUD")
+	if hud:
+		hud.add_child(overlay)
+	else:
+		add_child(overlay)
+	var lbl := Label.new()
+	lbl.set_anchors_preset(Control.PRESET_CENTER)
+	lbl.offset_left = -120; lbl.offset_right = 120
+	lbl.offset_top = -80; lbl.offset_bottom = 80
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.add_theme_font_override("font", Palette.FONT_DISPLAY_BOLD)
+	lbl.add_theme_font_size_override("font_size", 72)
+	lbl.add_theme_color_override("font_color", Palette.UI_CYAN)
+	overlay.add_child(lbl)
+	# Sequence: 3 → 2 → 1 → GO. Each beat scales up + fades through.
+	var beats: Array = ["3", "2", "1", "GO"]
+	var tween := create_tween()
+	for i in beats.size():
+		var text: String = beats[i]
+		var color: Color = Palette.UI_AMBER if i == beats.size() - 1 else Palette.UI_CYAN
+		tween.tween_callback(func():
+			lbl.text = text
+			lbl.add_theme_color_override("font_color", color)
+			lbl.modulate = Color(1, 1, 1, 1)
+			lbl.scale = Vector2.ONE * 0.7)
+		tween.tween_property(lbl, "scale", Vector2.ONE, 0.22).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+		tween.tween_property(lbl, "modulate:a", 0.0, 0.35).set_delay(0.2)
+	tween.tween_callback(func(): overlay.queue_free())
 
 func _auto_place_walls(side: int, count: int) -> void:
 	var cfg := GameConfig.data
@@ -290,7 +397,16 @@ func _try_deploy(screen: Vector2) -> void:
 		return
 	_mana -= float(_selected.cost)
 	var deployed := _selected
+	SfxBank.play_event(deployed, &"deploy")
 	_spawn_unit(deployed, world, false)
+	# Daily-ops tracking — player deploys only.
+	if DailyOps != null:
+		DailyOps.track(&"deploy_units", 1)
+		if deployed.role == CardData.Role.SWARM:
+			DailyOps.track(&"deploy_swarm", 1)
+		elif deployed.role == CardData.Role.SNIPER:
+			DailyOps.track(&"deploy_snipe", 1)
+	_stats_roles_played[deployed.role] = true
 	_refresh_ui()
 	hand.deselect()
 	hand.trigger_cooldown(deployed, deploy_cooldown)
@@ -322,12 +438,21 @@ func _on_unit_reached_base(side: int, world_pos: Vector2, damage: float) -> void
 	var target: Node2D = enemy_base if side == 1 else player_base
 	target.damage_at(world_pos, hits)
 	shake(3.0 + float(hits) * 0.5)
+	SfxBank.play(&"base_damage")
+	# side == 1 means the enemy base took damage (player unit scored).
+	if side == 1:
+		_stats_squares_destroyed += hits
+		if DailyOps != null:
+			DailyOps.track(&"destroy_squares", hits)
 	_check_win()
 	_update_coach()
 
 ## Public: trigger a screen shake. Called by units on death / melee detonation
-## via `get_tree().call_group("match", "shake", amount)`.
+## via `get_tree().call_group("match", "shake", amount)`. No-ops when the
+## player has disabled screen shake in settings.
 func shake(amount: float) -> void:
+	if PlayerProfile != null and PlayerProfile.data != null and not PlayerProfile.data.screen_shake_enabled:
+		return
 	_shake = maxf(_shake, amount)
 
 func _update_shake(delta: float) -> void:
@@ -368,9 +493,22 @@ func _advance_phase() -> void:
 func _end_match(result: String) -> void:
 	if phase == Phase.OVER:
 		return
+	# Capture the phase we were in BEFORE flipping to OVER so the
+	# overtime-win quest can see it.
+	var ending_phase: Phase = phase
 	phase = Phase.OVER
 	preview.hide_preview()
 	_selected = null
+	# Victory-only quest flushes.
+	if result == "VICTORY" and DailyOps != null:
+		if _stats_roles_played.size() >= 5:
+			DailyOps.track(&"play_roles", _stats_roles_played.size())
+		if _player_wall_count == 0:
+			DailyOps.track(&"no_walls", 1)
+		if ending_phase == Phase.OVERTIME:
+			DailyOps.track(&"overtime_win", 1)
+		if _mode != null and _mode.is_tutorial:
+			DailyOps.track(&"tutorial_replay", 1)
 	var rewards: Dictionary = {"gold": 0, "trophies": 0, "xp": 0, "levels": 0}
 	if _mode != null and _mode.is_tutorial:
 		# Tutorial grants a one-time completion reward and doesn't touch the
@@ -379,6 +517,10 @@ func _end_match(result: String) -> void:
 			rewards = PlayerProfile.complete_tutorial()
 	elif PlayerProfile != null:
 		rewards = PlayerProfile.award_match_result(result)
+	match result:
+		"VICTORY": SfxBank.play(&"victory")
+		"DEFEAT": SfxBank.play(&"defeat")
+		"DRAW": SfxBank.play(&"draw")
 	game_over.show_result(
 		result,
 		player_base.count_alive(),
@@ -388,6 +530,10 @@ func _end_match(result: String) -> void:
 		rewards.get("xp", 0),
 		rewards.get("levels", 0),
 	)
+	# Freeze the playfield behind the overlay. Units, projectiles, walls and
+	# bots all inherit the default pausable process mode; the overlay itself
+	# is PROCESS_MODE_ALWAYS (see GameOverOverlay._ready) so its buttons work.
+	get_tree().paused = true
 
 # --- Bot --------------------------------------------------------------------
 
@@ -469,13 +615,13 @@ func _refresh_build_ui() -> void:
 func _refresh_ui() -> void:
 	var cfg := GameConfig.data
 	mana_bar.set_value(_mana, cfg.mana_max)
-	mana_label.text = "⚡ %d/%d" % [int(_mana), cfg.mana_max]
+	mana_label.text = "%d / %d" % [int(_mana), cfg.mana_max]
 	var enemy_mana_val: float = 0.0
 	for b in _bots:
 		if b.is_enemy:
 			enemy_mana_val = b.mana
 			break
-	enemy_mana_label.text = "⚡ %d/%d" % [int(enemy_mana_val), cfg.mana_max]
+	enemy_mana_label.text = "%d / %d" % [int(enemy_mana_val), cfg.mana_max]
 	hand.set_affordability(int(_mana))
 	if phase == Phase.BUILD:
 		phase_label.text = "SETUP"

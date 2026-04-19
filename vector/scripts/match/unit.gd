@@ -39,7 +39,7 @@ func _ready() -> void:
 		elif card.id != &"":
 			level_mult = PlayerProfile.level_multiplier(card.id)
 	hp = card.hp * level_mult
-	base_damage = card.damage * level_mult
+	base_damage = card.damage * level_mult * _synergy_multiplier()
 	effective_damage = base_damage
 	add_to_group("units")
 	add_to_group("enemy_units" if is_enemy else "player_units")
@@ -59,6 +59,22 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	UnitRegistry.unregister(self)
 
+## Compute damage multiplier from active deck synergies. Only the player's
+## team benefits — bot decks don't participate (matches the Deck-tab UI,
+## which only shows synergies for the player's loadout).
+func _synergy_multiplier() -> float:
+	if is_enemy or Synergies == null or PlayerDeck == null:
+		return 1.0
+	var deck_ids: Array = []
+	for c in PlayerDeck.cards:
+		deck_ids.append(c.id)
+	var active: Array = Synergies.active_for(deck_ids)
+	var mult: float = 1.0
+	for pair in active:
+		if card.id == pair.a or card.id == pair.b:
+			mult += float(pair.bonus)
+	return mult
+
 func spawn_at(pos: Vector2) -> void:
 	world_pos = pos
 	_prev_world = pos
@@ -75,6 +91,7 @@ func take_damage(amount: float) -> void:
 func _die() -> void:
 	if card != null:
 		_spawn_death_burst()
+		SfxBank.play_event(card, &"death")
 		if card.on_death_shockwave_radius > 0.0:
 			_aoe_damage(card.on_death_shockwave_radius, card.on_death_shockwave_damage * level_mult)
 			_spawn_fx(world_pos, card.on_death_shockwave_radius, card.color, 0.55)
@@ -148,6 +165,7 @@ func _do_melee(delta: float) -> void:
 			_aoe_damage(radius, effective_damage * 0.6)
 			_spawn_fx(world_pos, radius, card.color, 0.5)
 			_spawn_death_burst()
+			SfxBank.play_event(card, &"death")
 			get_tree().call_group("match", "shake", 4.0)
 			queue_free()
 			return
@@ -224,7 +242,7 @@ func _deal_damage(target: Node2D, amount: float) -> void:
 		hp = minf(hp + amount * card.lifesteal_frac, max_hp)
 
 func _apply_aura_heal(delta: float) -> void:
-	for n in UnitRegistry.allies_of(self):
+	for n in UnitRegistry.allies_of(is_enemy):
 		if n == self or n.is_queued_for_deletion():
 			continue
 		var u := n as Unit
@@ -238,7 +256,7 @@ func _refresh_effective_damage() -> void:
 	_buff_mult = 1.0
 	# Registry keeps a per-team buffer list so this loop only iterates BUFFER
 	# units — typically 0, occasionally 1–2. O(1) array read per frame.
-	for n in UnitRegistry.buffers_for(self):
+	for n in UnitRegistry.buffers_for(is_enemy):
 		if n == self or n.is_queued_for_deletion():
 			continue
 		var u := n as Unit
@@ -270,6 +288,7 @@ func _try_fire(target_world: Vector2) -> void:
 	if _fire_cd > 0.0:
 		return
 	_fire_cd = card.fire_rate
+	SfxBank.play_event(card, &"shoot")
 	_spawn_projectiles(target_world)
 
 func _spawn_projectiles(target: Vector2) -> void:
@@ -302,7 +321,7 @@ func _pick_base_square_target() -> Vector2:
 func _find_nearest_enemy(within: float) -> Node2D:
 	var best: Node2D = null
 	var best_d2: float = within * within
-	for n in UnitRegistry.enemies_of(self):
+	for n in UnitRegistry.enemies_of(is_enemy):
 		if n.is_queued_for_deletion():
 			continue
 		var u := n as Node2D
@@ -317,7 +336,7 @@ func _find_nearest_enemy(within: float) -> Node2D:
 func _find_nearest_wounded_ally() -> Unit:
 	var best: Unit = null
 	var best_d2: float = INF
-	for n in UnitRegistry.allies_of(self):
+	for n in UnitRegistry.allies_of(is_enemy):
 		if n == self or n.is_queued_for_deletion():
 			continue
 		var u := n as Unit
@@ -333,7 +352,7 @@ func _find_nearest_wounded_ally() -> Unit:
 	return best
 
 func _aoe_damage(radius: float, dmg: float) -> void:
-	for n in UnitRegistry.enemies_of(self):
+	for n in UnitRegistry.enemies_of(is_enemy):
 		if n == self or n.is_queued_for_deletion():
 			continue
 		var u := n as Node2D

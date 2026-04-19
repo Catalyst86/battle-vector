@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1")
 id = &"lance"
+rarity = &"epic"
 display_name = "Lance"
 shape = 2
 role = 4

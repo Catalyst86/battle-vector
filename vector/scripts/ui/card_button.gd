@@ -63,49 +63,77 @@ func _gui_input(event: InputEvent) -> void:
 		var m := event as InputEventMouseButton
 		if m.pressed and m.button_index == MOUSE_BUTTON_LEFT:
 			accept_event()
+			SfxBank.play_ui(&"ui_click")
 			pressed.emit(card)
 
 func _refresh() -> void:
 	if not is_inside_tree():
 		return
+	# Hide the .tscn-era Label children — _draw() renders role/name/cost inline
+	# with the tactical typography so we don't double-draw.
+	if role_label: role_label.visible = false
+	if name_label: name_label.visible = false
+	if cost_label: cost_label.visible = false
 	if card == null:
-		if role_label: role_label.text = ""
-		if name_label: name_label.text = ""
-		if cost_label: cost_label.text = ""
 		queue_redraw()
 		return
-	role_label.text = card.role_label()
-	role_label.add_theme_color_override("font_color", card.color)
-	name_label.text = card.display_name.to_upper()
-	cost_label.text = str(card.cost)
 	queue_redraw()
 
 func _draw() -> void:
 	var rect := Rect2(Vector2.ZERO, size)
-	# Background.
-	var bg: Color = Palette.CARD_BG
+	# Background — dark tactical bg, tinted by card color when selected.
+	var bg: Color = Palette.UI_BG_1
 	if is_selected and card:
 		var tint := card.color
-		tint.a = 0.22
-		bg = tint
+		tint.a = 0.15
+		bg = Palette.UI_BG_1.blend(tint)
 	draw_rect(rect, bg, true)
+
+	# Role stripe along the top (2px) — color-code by function at a glance.
+	if card != null:
+		draw_rect(Rect2(0.0, 0.0, size.x, 2.0), card.color, true)
+
 	# Border.
-	var border: Color = Palette.CARD_BORDER
+	var border: Color = Palette.UI_LINE_2
 	if is_selected and card:
 		border = card.color
 	draw_rect(rect, border, false, 1.0)
 
-	# Shape icon (centered, about 38% of the card's width).
+	# Shape icon centered, role label above it, name below.
 	if card != null:
-		var icon_size: float = size.x * 0.22
-		var icon_center := Vector2(size.x * 0.5, size.y * 0.45)
+		var role_font: Font = Palette.FONT_DISPLAY
+		var role_text: String = card.role_label()
+		var role_fs: int = 7
+		var role_sz: Vector2 = role_font.get_string_size(role_text, HORIZONTAL_ALIGNMENT_CENTER, -1, role_fs)
+		draw_string(role_font,
+			Vector2(size.x * 0.5 - role_sz.x * 0.5, 12.0),
+			role_text, HORIZONTAL_ALIGNMENT_CENTER, -1, role_fs, card.color)
+
+		var icon_size: float = size.x * 0.24
+		var icon_center := Vector2(size.x * 0.5, size.y * 0.52)
 		draw_set_transform(icon_center, 0.0, Vector2.ONE)
-		ShapeRenderer.draw(self, card.shape, card.color, icon_size, 0.0)
+		ShapeRenderer.draw_with_glow(self, card.shape, card.color, icon_size, 0.0, 0.6)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
-		# Cost pip (bottom-left corner).
-		var pip_center := Vector2(8.0, size.y - 9.0)
-		draw_circle(pip_center, 3.0, Palette.MANA)
+		# Name at bottom.
+		var name_font: Font = Palette.FONT_DISPLAY_BOLD
+		var name_text: String = card.display_name.to_upper()
+		var name_fs: int = 8
+		var name_sz: Vector2 = name_font.get_string_size(name_text, HORIZONTAL_ALIGNMENT_CENTER, -1, name_fs)
+		draw_string(name_font,
+			Vector2(size.x * 0.5 - name_sz.x * 0.5, size.y - 6.0),
+			name_text, HORIZONTAL_ALIGNMENT_CENTER, -1, name_fs, Palette.UI_TEXT_0)
+
+		# Cost pip (top-left corner, amber circle with number).
+		var pip_center := Vector2(9.0, 12.0)
+		draw_circle(pip_center, 7.5, Palette.UI_AMBER)
+		var cost_font: Font = Palette.FONT_MONO_BOLD
+		var cost_text: String = str(card.cost)
+		var cost_fs: int = 9
+		var cost_sz: Vector2 = cost_font.get_string_size(cost_text, HORIZONTAL_ALIGNMENT_CENTER, -1, cost_fs)
+		draw_string(cost_font,
+			pip_center - Vector2(cost_sz.x * 0.5, -3.0),
+			cost_text, HORIZONTAL_ALIGNMENT_CENTER, -1, cost_fs, Color.BLACK)
 
 	# Dim overlay when unaffordable.
 	if is_dimmed:
@@ -115,3 +143,9 @@ func _draw() -> void:
 		var frac: float = cooldown_remaining / cooldown_total
 		var cd_h: float = size.y * frac
 		draw_rect(Rect2(0.0, size.y - cd_h, size.x, cd_h), Color(0, 0, 0, 0.65), true)
+
+	# Selection glow — brighter 1px inner outline.
+	if is_selected and card:
+		var glow := card.color
+		glow.a = 0.5
+		draw_rect(Rect2(1, 1, size.x - 2, size.y - 2), glow, false, 1.0)

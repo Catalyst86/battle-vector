@@ -52,6 +52,13 @@ func save_deck(new_cards: Array[CardData]) -> void:
 		push_error("PlayerDeck save failed: %d" % err)
 
 ## All playable cards in the pool, sorted by cost then name for stable UI.
+##
+## Handles three entry shapes that DirAccess can surface depending on build:
+##   - foo.tres        (editor runs, desktop exports)
+##   - foo.tres.remap  (Android/iOS exports — Godot renames the original)
+##   - foo.tres.import (rare; import-sidecar variant)
+## All three map back to the same resource path `foo.tres`. We de-dupe by
+## card id so if two variants of the same file show up, we only add it once.
 func pool() -> Array[CardData]:
 	if not _pool_cache.is_empty():
 		return _pool_cache
@@ -59,13 +66,21 @@ func pool() -> Array[CardData]:
 	if dir == null:
 		push_error("PlayerDeck: cannot open %s" % CARDS_DIR)
 		return []
+	var seen_ids: Dictionary = {}
 	dir.list_dir_begin()
 	var file := dir.get_next()
 	while file != "":
-		if not dir.current_is_dir() and file.ends_with(".tres") and not file.begins_with("_"):
-			var c := load(CARDS_DIR + file) as CardData
-			if c != null:
-				_pool_cache.append(c)
+		if not dir.current_is_dir():
+			var stem: String = file
+			for suffix in [".remap", ".import"]:
+				if stem.ends_with(suffix):
+					stem = stem.trim_suffix(suffix)
+					break
+			if stem.ends_with(".tres") and not stem.begins_with("_"):
+				var c := load(CARDS_DIR + stem) as CardData
+				if c != null and not seen_ids.has(c.id):
+					seen_ids[c.id] = true
+					_pool_cache.append(c)
 		file = dir.get_next()
 	_pool_cache.sort_custom(func(a: CardData, b: CardData) -> bool:
 		if a.cost != b.cost:

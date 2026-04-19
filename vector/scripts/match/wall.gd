@@ -34,6 +34,7 @@ func take_damage(amount: float) -> void:
 	hp = maxf(0.0, hp - amount)
 	if hp <= 0.0:
 		_dying = true
+		SfxBank.play(&"wall_break")
 		destroyed.emit()
 		queue_free()
 

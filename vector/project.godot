@@ -28,6 +28,13 @@ PlayerProfile="*res://autoload/player_profile.gd"
 CurrentMatch="*res://autoload/current_match.gd"
 UnitRegistry="*res://autoload/unit_registry.gd"
 SpawnPool="*res://autoload/spawn_pool.gd"
+SfxBank="*res://autoload/sfx_bank.gd"
+MusicPlayer="*res://autoload/music_player.gd"
+DailyOps="*res://autoload/daily_ops.gd"
+SeasonPass="*res://autoload/season_pass.gd"
+Synergies="*res://autoload/synergies.gd"
+Leaderboard="*res://autoload/leaderboard.gd"
+Toast="*res://autoload/toast.gd"
 
 [display]
 
@@ -42,6 +49,7 @@ window/handheld/orientation=1
 [input_devices]
 
 pointing/emulate_touch_from_mouse=true
+pointing/emulate_mouse_from_touch=true
 
 [physics]
 
@@ -51,6 +59,7 @@ common/enable_pause_aware_picking=true
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0
+textures/vram_compression/import_etc2_astc=true
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 anti_aliasing/quality/msaa_2d=2

@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VECTOR·TD / DESIGN MOCK</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root {
+    --bg-0: #050811;
+    --bg-1: #0A1121;
+    --bg-2: #101A34;
+    --bg-3: #18244A;
+    --line: #1F2A48;
+    --line-bright: #2E3C66;
+
+    --cyan: #39F0FF;
+    --cyan-mid: #18A9BD;
+    --cyan-dim: #1C6A7A;
+    --cyan-glow: rgba(57,240,255,0.35);
+
+    --gold: #FFB020;
+    --gold-dim: #6A4510;
+
+    --red: #FF3B57;
+    --red-dim: #7A1C2A;
+
+    --green: #4AE67A;
+    --purple: #B47AFF;
+    --magenta: #FF70D2;
+
+    --bone: #F2EEE6;
+    --bone-dim: #7E89A4;
+    --bone-xdim: #4A5472;
+  }
+
+  html, body { background: #020308; color: var(--bone); }
+  body {
+    font-family: 'JetBrains Mono', monospace;
+    font-feature-settings: 'tnum' 1, 'ss01' 1;
+    letter-spacing: 0.01em;
+    padding: 48px 16px 96px;
+  }
+  .font-tactical { font-family: 'Michroma', sans-serif; }
+  .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* Scanlines — only noticeable up close, reads as a CRT patina */
+  .scanlines::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      180deg,
+      transparent 0,
+      transparent 2px,
+      rgba(255,255,255,0.018) 2px,
+      rgba(255,255,255,0.018) 3px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* 24px technical drawing grid underlay */
+  .grid-underlay {
+    background-image:
+      linear-gradient(90deg, rgba(31,42,72,0.45) 1px, transparent 1px),
+      linear-gradient(0deg, rgba(31,42,72,0.45) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  /* L-shaped corner brackets — the signature motif */
+  .brackets-cyan { position: relative; }
+  .brackets-cyan::before,
+  .brackets-cyan::after {
+    content: '';
+    position: absolute;
+    width: 7px; height: 7px;
+    border: 1px solid var(--cyan);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .brackets-cyan::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+  .brackets-cyan::after  { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+  /* Segmented bar — discrete ammo-count feel vs smooth fill */
+  .seg-bar { display: flex; gap: 2px; height: 8px; }
+  .seg-bar .seg { flex: 1; background: var(--bg-3); }
+  .seg-bar .seg.on { background: var(--cyan); box-shadow: inset 0 0 3px rgba(255,255,255,0.25), 0 0 3px var(--cyan-glow); }
+  .seg-bar .seg.partial { background: linear-gradient(90deg, var(--cyan) 40%, var(--bg-3) 40%); }
+  .seg-bar.red .seg.on { background: var(--red); box-shadow: inset 0 0 3px rgba(255,255,255,0.2), 0 0 3px rgba(255,59,87,0.4); }
+
+  /* Chamfered 45° button — clipping instead of rounded */
+  .btn-chamfer {
+    clip-path: polygon(
+      6px 0,
+      calc(100% - 6px) 0,
+      100% 6px,
+      100% calc(100% - 6px),
+      calc(100% - 6px) 100%,
+      6px 100%,
+      0 calc(100% - 6px),
+      0 6px
+    );
+  }
+
+  /* Pulsing tactical glow for primary actions */
+  @keyframes pulse-glow {
+    0%,100% { box-shadow: 0 0 6px var(--cyan-glow), inset 0 0 20px rgba(57,240,255,0.08); }
+    50%     { box-shadow: 0 0 12px var(--cyan), inset 0 0 24px rgba(57,240,255,0.15); }
+  }
+  .pulse-glow { animation: pulse-glow 2.4s ease-in-out infinite; }
+
+  /* Subtle scan pulse animation for active phase label */
+  @keyframes scan-line {
+    0%,100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+  .scan-pulse { animation: scan-line 1.8s ease-in-out infinite; }
+
+  /* Card tile — linear gradient floor, hover lift */
+  .card-tile {
+    background: linear-gradient(180deg, var(--bg-1), var(--bg-0));
+    border: 1px solid var(--line);
+    transition: transform 0.18s, border-color 0.18s, box-shadow 0.18s;
+    position: relative;
+  }
+  .card-tile:hover { border-color: var(--cyan-mid); transform: translateY(-1px); box-shadow: 0 0 10px rgba(57,240,255,0.2); }
+  .card-tile.locked { opacity: 0.38; }
+  .card-tile .role-stripe {
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  }
+
+  /* Shape icon gets a subtle glow — matches in-game glow pass */
+  .shape-icon { filter: drop-shadow(0 0 4px currentColor); }
+
+  .no-scroll::-webkit-scrollbar { display: none; }
+  .no-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Phone frame */
+  .phone {
+    width: 360px;
+    height: 780px;
+    background: var(--bg-0);
+    border: 1px solid var(--line-bright);
+    box-shadow: 0 30px 90px rgba(0,0,0,0.65), 0 0 0 8px #000, 0 0 0 9px var(--line);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Diagonal hash decorative fill */
+  .hash-fill {
+    background-image: repeating-linear-gradient(135deg,
+      rgba(57,240,255,0.12) 0, rgba(57,240,255,0.12) 1px,
+      transparent 1px, transparent 4px);
+  }
+
+  /* Arena path dot connector */
+  .arena-dot { width: 8px; height: 8px; border: 1px solid var(--cyan); background: var(--bg-0); }
+  .arena-dot.cleared { background: var(--cyan); box-shadow: 0 0 4px var(--cyan-glow); }
+  .arena-dot.current { background: var(--gold); border-color: var(--gold); box-shadow: 0 0 6px var(--gold); }
+  .arena-line { flex: 1; height: 1px; background: var(--line); }
+  .arena-line.cleared { background: var(--cyan-mid); }
+
+  /* xp-node spiral — unique decorative sigil top-right of identity */
+  @keyframes rotate-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .rotate-slow { animation: rotate-slow 20s linear infinite; transform-origin: center; }
+
+  /* color-shift tokens for role */
+  .role-SHOOT { color: var(--cyan); }
+  .role-MELEE { color: var(--red); }
+  .role-BREAK { color: var(--purple); }
+  .role-INTCP { color: var(--gold); }
+  .role-SNIPE { color: var(--cyan); }
+  .role-SWARM { color: var(--magenta); }
+  .role-HEAL  { color: var(--green); }
+  .role-BUFF  { color: var(--gold); }
+
+  /* the rationale prose */
+  .prose p { margin-bottom: 14px; line-height: 1.65; color: var(--bone-dim); }
+  .prose strong { color: var(--bone); font-weight: 500; }
+  .prose em { color: var(--cyan); font-style: normal; letter-spacing: 0.05em; }
+</style>
+</head>
+<body>
+
+<!-- ==================================================
+     DESIGN RATIONALE
+     ================================================== -->
+<header class="max-w-3xl mx-auto mb-14">
+  <div class="flex items-baseline gap-4 mb-1">
+    <span class="font-tactical text-[28px]" style="color: var(--cyan); letter-spacing: 0.14em;">VECTOR·TD</span>
+    <span class="font-mono text-[10px]" style="color: var(--bone-xdim); letter-spacing: 0.2em;">DESIGN·MOCK / v0</span>
+  </div>
+  <div class="h-px w-full mb-2" style="background: linear-gradient(90deg, var(--cyan), transparent);"></div>
+
+  <div class="font-tactical text-[10px] mb-6" style="color: var(--gold); letter-spacing: 0.3em;">
+    ░░░ DIRECTION / TACTICAL·OPS·TERMINAL ░░░
+  </div>
+
+  <div class="prose text-[13px]">
+    <p>
+      The existing nomenclature — <em>VEC.BLUE</em>, <em>ARENA</em>, <em>GROUND ZERO</em>, <em>APEX GRID</em> — reads like military
+      call-signs. I doubled down on that. This menu is recast as a <strong>combat operations terminal</strong>, not an app. Every
+      surface wears L-shaped corner brackets, every number is tabular-aligned with leading zeros, every control leads with a
+      function label and decoration follows.
+    </p>
+
+    <p>
+      <strong>Typography.</strong> <span class="font-tactical" style="color: var(--cyan);">Michroma</span> for display —
+      wide, 90° letterforms that read as machined metal, never used in consumer apps. Paired with
+      <span class="font-mono" style="color: var(--cyan);">JetBrains Mono</span> for data readouts (terminal authority, tabular
+      numerals). No body sans. The absence is intentional — this is a HUD, not a brochure.
+    </p>
+
+    <p>
+      <strong>Color.</strong> Existing palette survives but is tightened. Cyan pushed to <span class="font-mono" style="color: var(--cyan);">#39F0FF</span>
+      (electric, instrument-cluster bright). Gold warmer. Background a touch cooler. Red held strictly in reserve for the
+      opponent. White-ish body text shifts from <span class="font-mono">#E5E7EB</span> (sterile grey) to
+      <span class="font-mono" style="color: var(--bone);">#F2EEE6</span> (warm bone). That one swap kills most of the flat
+      "AI-generated" feel before any layout changes.
+    </p>
+
+    <p>
+      <strong>Signature motifs.</strong>
+      <em>(1)</em> L-shaped corner brackets everywhere — the UI feels clipped together rather than rounded-soft.
+      <em>(2)</em> Segmented bars for XP and mana, not smooth fills — they read as discrete ammo counts.
+      <em>(3)</em> Tabular numbers with leading zeros everywhere (<span class="font-mono">0607 G</span>, <span class="font-mono">LVL·02</span>).
+      <em>(4)</em> A fine 24px technical-drawing grid under every surface.
+      <em>(5)</em> Chamfered 45° corners on primary buttons, not rounded rectangles.
+      <em>(6)</em> Faint scanlines across the whole display.
+    </p>
+
+    <p>
+      <strong>Intuitive wins.</strong>
+      Upgrades are <em>inline</em> on each card tile (no more hunting for a grey strip — the UPGRADE row has its own gold bar
+      at the bottom of every unlocked card). Role is color-coded <em>and</em> carries a top stripe, so your eye groups by function
+      at a glance. The XP bar segments map to discrete states (reads "halfway through level"). The bottom battle row is weighted
+      <span class="font-mono" style="color: var(--cyan);">2×1×1</span> — 1v1 is primary, emphasised and glowing; 2v2 and TUTORIAL
+      clearly secondary.
+      Emoji-free — only BMP glyphs (<span class="font-mono">★ ◆ ▸ → ● ○ ▾</span>) that render reliably on Android's default
+      Godot font.
+    </p>
+
+    <p style="color: var(--bone-xdim);">
+      Screens render at their native 360×780 below. Both phones are static — no scrolling — so you can see the complete rest
+      layout. A tap / hover will subtly surface button states.
+    </p>
+  </div>
+</header>
+
+<!-- ==================================================
+     SCREENS
+     ================================================== -->
+<main class="flex gap-16 justify-center flex-wrap max-w-7xl mx-auto">
+
+  <!-- ============ SCREEN 01 : MAIN MENU ============ -->
+  <section>
+    <div class="font-tactical text-[10px] mb-4 flex items-center gap-3" style="color: var(--bone-xdim); letter-spacing: 0.28em;">
+      <span style="color: var(--cyan);">01</span> MAIN·MENU / COLLECTION
+      <div class="h-px w-20" style="background: var(--line);"></div>
+    </div>
+    <div class="phone scanlines">
+      <div class="absolute inset-0 grid-underlay opacity-50"></div>
+
+      <div class="relative h-full flex flex-col">
+
+        <!-- TOP STRIP : brand / settings -->
+        <div class="flex items-center justify-between px-4 pt-3 pb-2" style="border-bottom: 1px solid var(--line);">
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2" style="background: var(--cyan); box-shadow: 0 0 4px var(--cyan);"></div>
+            <span class="font-tactical text-[9px]" style="color: var(--cyan); letter-spacing: 0.3em;">VECTOR·TD</span>
+            <span class="font-mono text-[7px]" style="color: var(--bone-xdim);">v0.12</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="font-mono text-[7px]" style="color: var(--bone-xdim); letter-spacing: 0.2em;">NET·OFF</span>
+            <button class="font-tactical text-[9px] cursor-pointer hover:opacity-70" style="color: var(--cyan); letter-spacing: 0.25em;">
+              SET<span style="color: var(--bone-xdim);">·</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- IDENTITY BLOCK -->
+        <div class="px-4 pt-3 pb-3 relative">
+          <div class="flex items-start gap-3">
+            <!-- Avatar sigil -->
+            <div class="relative flex-shrink-0 brackets-cyan" style="width: 54px; height: 54px; padding: 4px;">
+              <svg viewBox="0 0 46 46" class="w-full h-full">
+                <!-- outer slow-rotating ring of tick marks -->
+                <g class="rotate-slow" style="transform-origin: 23px 23px;">
+                  <circle cx="23" cy="23" r="20" fill="none" stroke="var(--cyan-dim)" stroke-width="0.5" stroke-dasharray="1 4"/>
+                </g>
+                <!-- hexagon frame -->
+                <polygon points="23,5 38,14 38,32 23,41 8,32 8,14" fill="none" stroke="var(--cyan)" stroke-width="1"/>
+                <polygon points="23,11 33,17 33,29 23,35 13,29 13,17" fill="var(--cyan)" opacity="0.1"/>
+                <!-- sigil: triangle + diamond -->
+                <polygon points="23,15 30,23 23,31 16,23" fill="var(--cyan)" opacity="0.7"/>
+                <polygon points="23,19 28,23 23,27 18,23" fill="var(--bg-0)"/>
+              </svg>
+            </div>
+
+            <!-- Identity text -->
+            <div class="flex-1 min-w-0 pt-0.5">
+              <div class="flex items-center gap-2 mb-0.5">
+                <span class="font-tactical text-[8px]" style="color: var(--bone-dim); letter-spacing: 0.22em;">CALL·SIGN</span>
+                <div class="h-px flex-1" style="background: var(--line);"></div>
+              </div>
+              <div class="font-tactical text-[17px] leading-none" style="color: var(--cyan); letter-spacing: 0.1em;">VEC·BLUE</div>
+              <div class="font-mono text-[8px] mt-1" style="color: var(--bone-xdim);">
+                <span style="color: var(--bone-dim);">ID·0001·A</span> / ARENA·01·GZERO
+              </div>
+            </div>
+
+            <!-- vertical tick strip right -->
+            <div class="flex flex-col items-end gap-1 pt-1">
+              <div class="font-mono text-[7px]" style="color: var(--bone-xdim);">T·0420</div>
+              <div class="font-mono text-[7px]" style="color: var(--green);">● ONLINE</div>
+            </div>
+          </div>
+
+          <!-- STATS ROW -->
+          <div class="grid grid-cols-2 gap-2 mt-3">
+            <!-- Trophy box -->
+            <div class="relative px-2 py-1.5 flex items-center gap-2" style="background: var(--bg-1); border: 1px solid var(--line); border-left: 2px solid var(--gold);">
+              <span class="text-[13px] leading-none" style="color: var(--gold);">★</span>
+              <div class="flex-1 min-w-0">
+                <div class="font-mono text-[7px]" style="color: var(--bone-xdim); letter-spacing: 0.18em;">TROPHY</div>
+                <div class="font-tactical text-[13px] leading-none mt-0.5" style="color: var(--gold); letter-spacing: 0.05em;">0070</div>
+              </div>
+              <div class="font-mono text-[7px]" style="color: var(--green);">+30</div>
+            </div>
+            <!-- Gold box -->
+            <div class="relative px-2 py-1.5 flex items-center gap-2" style="background: var(--bg-1); border: 1px solid var(--line); border-left: 2px solid var(--gold);">
+              <span class="text-[11px] leading-none" style="color: var(--gold);">◆</span>
+              <div class="flex-1 min-w-0">
+                <div class="font-mono text-[7px]" style="color: var(--bone-xdim); letter-spacing: 0.18em;">CREDITS</div>
+                <div class="font-tactical text-[13px] leading-none mt-0.5" style="color: var(--gold); letter-spacing: 0.05em;">0607</div>
+              </div>
+              <div class="font-mono text-[7px]" style="color: var(--green);">+60</div>
+            </div>
+          </div>
+
+          <!-- XP SEGMENTED BAR -->
+          <div class="mt-3">
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-tactical text-[9px]" style="color: var(--cyan); letter-spacing: 0.22em;">LVL·02</span>
+              <span class="font-mono text-[8px]" style="color: var(--bone-xdim);">069 / 440 <span style="color: var(--bone-dim);">XP</span></span>
+            </div>
+            <div class="seg-bar">
+              <div class="seg on"></div>
+              <div class="seg on"></div>
+              <div class="seg partial"></div>
+              <div class="seg"></div>
+              <div class="seg"></div>
+              <div class="seg"></div>
+              <div class="seg"></div>
+              <div class="seg"></div>
+              <div class="seg"></div>
+              <div class="seg"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB STRIP -->
+        <div class="px-4">
+          <div class="flex items-end gap-0" style="border-bottom: 1px solid var(--line);">
+            <div class="flex-1 text-center py-2 font-tactical text-[9px] relative cursor-pointer" style="color: var(--cyan); letter-spacing: 0.22em;">
+              COLL
+              <div class="absolute bottom-[-1px] left-2 right-2 h-[2px]" style="background: var(--cyan); box-shadow: 0 0 6px var(--cyan-glow);"></div>
+            </div>
+            <div class="flex-1 text-center py-2 font-tactical text-[9px] cursor-pointer hover:opacity-80" style="color: var(--bone-dim); letter-spacing: 0.22em;">DECK</div>
+            <div class="flex-1 text-center py-2 font-tactical text-[9px] cursor-pointer hover:opacity-80" style="color: var(--bone-dim); letter-spacing: 0.22em;">RANK</div>
+            <div class="flex-1 text-center py-2 font-tactical text-[9px] cursor-pointer hover:opacity-80" style="color: var(--bone-dim); letter-spacing: 0.22em;">SHOP</div>
+          </div>
+        </div>
+
+        <!-- TAB CONTENT : Collection grid -->
+        <div class="flex-1 overflow-hidden px-3 pt-2 no-scroll">
+          <div class="flex items-center gap-2 mb-2 px-1">
+            <div class="font-tactical text-[8px]" style="color: var(--bone-dim); letter-spacing: 0.22em;">▾ UNLOCKED</div>
+            <div class="h-px flex-1" style="background: var(--line);"></div>
+            <div class="font-mono text-[8px]" style="color: var(--bone-xdim); letter-spacing: 0.1em;">08 / 28</div>
+          </div>
+
+          <div class="grid grid-cols-4 gap-1.5">
+            <!-- helper: card tiles — inline SVGs -->
+            <!-- 1 DART shooter cyan -->
+            <div class="card-tile p-1.5 pt-2 flex flex-col items-center cursor-pointer" style="aspect-ratio: 0.82;">
+              <div class="role-stripe" style="background: var(--cyan);"></div>
+              <div class="w-full flex justify-between items-center font-mono text-[6px]">
+                <span class="role-SHOOT">SHOOT</span>
+                <span class="px-1" style="color: var(--bone-dim); background: var(--bg-2);">L2</span>
+              </div>
+              <div class="flex-1 flex items-center justify-center py-0.5">
+                <svg viewBox="-16 -16 32 32" class="w-7 h-7 shape-icon" style="color: var(--cyan);">
+                  <polygon points="0,-12 10,8 -10,8" fill="currentColor"/>
+                </svg>
+              </div>
+              <div class="font-tactical text-[8px]" style="color: var(--bone); letter-spacing: 0.08em;">DART</div>
+              <div class="w-full mt-1 py-0.5 text-center font-mono text-[8px]" style="background: rgba(255,176,32,0.1); color: var(--gold); border-top: 1px solid var(--gold-dim); letter-spacing: 0.08em;">UP·020</div>
+            </div>
+            <!-- 2 BOMB melee red -->
+            <div class="card-tile p-1.5 pt-2 flex flex-col items-center cursor-pointer" style="aspect-ratio: 0.82;">
+              <div class="role-stripe" style="background: var(--red);"></div>
+              <div class="w-full flex justify-between items-center font-mono text-[6px]">
+                <span class="role-MELEE">MELEE</span>
+                <span class="px-1" style="color: var(--bone-dim); background: var(--bg-2);">L4</span>
+              </div>
+              <div class="flex-1 flex items-center justify-center py-0.5">
+                <svg viewBox="-16 -16 32 32" class="w-7 h-7 shape-icon" style="color: var(--red);">
+                  <rect x="-10" y="-10" width="20" height="20" fill="currentColor"/>
+                </svg>
+              </div>
+              <div class="font-tactical text-[8px]" style="color: var(--bone); letter-spacing: 0.08em;">BOMB</div>
+              <div class="w-full mt-1 py-0.5 text-center font-mono text-[8px]" style="background: rgba(255,176,32,0.1); color: var(--gold); border-top: 1px solid var(--gold-dim); letter-spacing: 0.08em;">UP·050</div>
+            </div>
+            <!-- 3 SPIRAL break purple -->
+            <div class="card-tile p-1.5 pt-2 flex flex-col items-center cursor-pointer" style="aspect-ratio: 0.82;">
+              <div class="role-stripe" style="background: var(--purple);"></div>
+              <div class="w-full flex justify-between items-center font-mono text-[6px]">
+                <span class="role-BREAK">BREAK</span>
+                <span class="px-1" style="color: var(--bone-dim); background: var(--bg-2);">L3</span>
+              </div>
+              <div class="flex-1 flex items-center justify-center py-0.5">
+                <svg viewBox="-16 -16 32 32" class="w-7 h-7 shape-icon" style="color: var(--purple);">
+                  <path d="M 0 -10 A 10 10 0 1 1 -0.01 -10 M -7 -2 A 6 6 0 1 0 -6.99 -2 M -2 2 A 3 3 0 1 1 -1.99 2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                </svg>
+              </div>
+              <div class="font-tactical text-[8px]" style="color: var(--bone); letter-spacing: 0.08em;">SPIRAL</div>
+              <div class="w-full mt-1 py-0.5 text-center font-mono text-[8px]" style="background: rgba(255,176,32,0.1); color: var(--gold); border-top: 1px solid var(--gold-dim); letter-spacing: 0.08em;">UP·100</div>
+            </div>
+            <!-- 4 BURST intcp gold -->
+            <div class="card-tile p-1.5 pt-2 flex flex-col items-center cursor-pointer" style="aspect-ratio: 0.82;">
+              <div class="role-stripe" style="background: var(--gold);"></div>
+              <div class="w-full flex justify-between items-center font-mono text-[6px]">
+                <span class="role-INTCP">INTCP</span>
+                <span class="px-1" style="color: var(--bone-dim); background: var(--bg-2);">L3</span>
+              </div>
+              <div class="flex-1 flex items-center justify-center py-0.5">
+                <svg viewBox="-16 -16 32 32" class="w-7 h-7 shape-icon" style="color: var(--gold);">
+                  <polygon points="0,-12 3,-4 11,-4 5,2 7,10 0,5 -7,10 -5,2 -11,-4 -3,-4" fill="currentColor"/>
+                </svg>
+              </div>
+              <div class="font-tactical text-[8px]" style="color: var(--bone); letter-spacing: 0.08em;">BURST</div>
+              <div class="w-full mt-1 py-0.5 text-center font-mono text-[8px]" style="background: rgba(255,176,32,0.1); color: var(--gold); border-top: 1px solid var(--gold-dim); letter-spacing: 0.08em;">UP·100</div>
+            </div>
+            <!-- 5 LANCE snipe cyan -->
+            <div class="card-tile p-1.5 pt-2 flex flex-col items-center cursor-pointer" style="aspect-ratio: 0.82;">
+              <div class="role-stripe" style="background: var(--cyan);"></div>
+              <div class="w-full flex justify-between items-center font-mono text-[6px]">
+                <span class="role-SNIPE">SNIPE</span>
+                <span class="px-1" style="color: var(--bone-dim); background: var(--bg-2);">L5</span>
+              </div>
+              <div class="flex-1 flex items-center justify-center py-0.5">
+                <svg viewBox="-16 -16 32 32" class="w-7 h-7 shape-icon" style="color: var(--cyan);">
+                  <polygon points="0,-12 10,0 0,12 -10,0" fill="currentColor"/>
+                </svg>
+              </div>
+              <div class="font-tactical text-[8px]" style="color: var(--bone); letter-spacing: 0.08em;">LANCE</div>
+              <div class="w-full mt-1 py-0.5 text-center font-mono text-[8px]" style="background: rgba(255,176,32,0.1); color: var(--gold); border-top: 1px solid var(--gold-dim); letter-spacing: 0.08em;">UP·200</div>
+            </div>
+            <!-- 6 ORB shooter green -->
+            <div class="card-tile p-1.5 pt-2 flex flex-col items-center cursor-pointer" style="aspect-ratio: 0.82;">
+              <div class="role-stripe" style="background: var(--green);"></div>
+              <div class="w-full flex justify-between items-center font-mono text-[6px]">
+                <span style="color: var(--green);">SHOOT</span>
+                <span class="px-1" style="color: var(--bone-dim); background: var(--bg-2);">L2</span>
+              </div>
+              <div class="flex-1 flex items-center justify-center py-0.5">
+                <svg viewBox="-16 -16 32 32" class="w-7 h-7 shape-icon" style="color: var(--green);">
+                  <circle cx="0" cy="0" r="11" fill="none" stroke="currentColor" stroke-width="2.5"/>
+                </svg>
+              </div>
+              <div class="font-tactical text-[8px]" style="color: var(--bone); letter-spacing: 0.08em;">ORB</div>
+              <div class="w-full mt-1 py-0.5 text-center font-mono text-[8px]" style="background: rgba(255,176,32,0.1); color: var(--gold); border-top: 1px solid var(--gold-dim); letter-spacing: 0.08em;">UP·020</div>
+            </div>
+            <!-- 7 CHEVRON swarm pink -->
+            <div class="card-tile p-1.5 pt-2 flex flex-col items-center cursor-pointer" style="aspect-ratio: 0.82;">
+              <div class="role-stripe" style="background: var(--magenta);"></div>
+              <div class="w-full flex justify-between items-center font-mono text-[6px]">
+                <span class="role-SWARM">SWARM</span>
+                <span class="px-1" style="color: var(--bone-dim); background: var(--bg-2);">L4</span>
+              </div>
+              <div class="flex-1 flex items-center justify-center py-0.5">
+                <svg viewBox="-16 -16 32 32" class="w-7 h-7 shape-icon" style="color: var(--magenta);">
+                  <path d="M -11,-4 L 0,6 L 11,-4 L 8,-7 L 0,-1 L -8,-7 Z" fill="currentColor"/>
+                </svg>
+              </div>
+              <div class="font-tactical text-[8px]" style="color: var(--bone); letter-spacing: 0.08em;">CHEVRON</div>
+              <div class="w-full mt-1 py-0.5 text-center font-mono text-[8px]" style="background: rgba(255,176,32,0.1); color: var(--gold); border-top: 1px solid var(--gold-dim); letter-spacing: 0.08em;">UP·100</div>
+            </div>
+            <!-- 8 PULSE intcp purple -->
+            <div class="card-tile p-1.5 pt-2 flex flex-col items-center cursor-pointer" style="aspect-ratio: 0.82;">
+              <div class="role-stripe" style="background: var(--purple);"></div>
+              <div class="w-full flex justify-between items-center font-mono text-[6px]">
+                <span class="role-INTCP">INTCP</span>
+                <span class="px-1" style="color: var(--bone-dim); background: var(--bg-2);">L5</span>
+              </div>
+              <div class="flex-1 flex items-center justify-center py-0.5">
+                <svg viewBox="-16 -16 32 32" class="w-7 h-7 shape-icon" style="color: var(--purple);">
+                  <circle cx="0" cy="0" r="11" fill="none" stroke="currentColor" stroke-width="2"/>
+                  <circle cx="0" cy="0" r="5" fill="currentColor"/>
+                </svg>
+              </div>
+              <div class="font-tactical text-[8px]" style="color: var(--bone); letter-spacing: 0.08em;">PULSE</div>
+              <div class="w-full mt-1 py-0.5 text-center font-mono text-[8px]" style="background: rgba(255,176,32,0.1); color: var(--gold); border-top: 1px solid var(--gold-dim); letter-spacing: 0.08em;">UP·200</div>
+            </div>
+            <!-- 9-12 LOCKED row (dimmed with lock requirement) -->
+            <div class="card-tile locked p-1.5 pt-2 flex flex-col items-center" style="aspect-ratio: 0.82;">
+              <div class="role-stripe" style="background: var(--line);"></div>
+              <div class="w-full flex justify-between items-center font-mono text-[6px]">
+                <span style="color: var(--bone-xdim);">─────</span>
+                <span class="px-1" style="color: var(--bone-xdim);">L?</span>
+              </div>
+              <div class="flex-1 flex items-center justify-center py-0.5">
+                <svg viewBox="-16 -16 32 32" class="w-7 h-7" style="color: var(--bone-xdim);">
+                  <polygon points="0,-10 8,-2 8,6 -8,6 -8,-2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                  <text x="0" y="4" text-anchor="middle" fill="currentColor" font-size="9" font-family="JetBrains Mono">?</text>
+                </svg>
+              </div>
+              <div class="font-tactical text-[8px]" style="color: var(--bone-xdim);">LOCKED</div>
+              <div class="w-full mt-1 py-0.5 text-center font-mono text-[7px]" style="background: var(--bg-1); color: var(--bone-xdim); border-top: 1px solid var(--line); letter-spacing: 0.12em;">LVL·04</div>
+            </div>
+            <div class="card-tile locked p-1.5 pt-2 flex flex-col items-center" style="aspect-ratio: 0.82;">
+              <div class="role-stripe" style="background: var(--line);"></div>
+              <div class="w-full flex justify-between items-center font-mono text-[6px]">
+                <span style="color: var(--bone-xdim);">─────</span>
+                <span class="px-1" style="color: var(--bone-xdim);">L?</span>
+              </div>
+              <div class="flex-1 flex items-center justify-center py-0.5">
+                <svg viewBox="-16 -16 32 32" class="w-7 h-7" style="color: var(--bone-xdim);">
+                  <polygon points="0,-10 8,-2 8,6 -8,6 -8,-2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                  <text x="0" y="4" text-anchor="middle" fill="currentColor" font-size="9" font-family="JetBrains Mono">?</text>
+                </svg>
+              </div>
+              <div class="font-tactical text-[8px]" style="color: var(--bone-xdim);">LOCKED</div>
+              <div class="w-full mt-1 py-0.5 text-center font-mono text-[7px]" style="background: var(--bg-1); color: var(--bone-xdim); border-top: 1px solid var(--line); letter-spacing: 0.12em;">LVL·05</div>
+            </div>
+            <div class="card-tile locked p-1.5 pt-2 flex flex-col items-center" style="aspect-ratio: 0.82;">
+              <div class="role-stripe" style="background: var(--line);"></div>
+              <div class="w-full flex justify-between items-center font-mono text-[6px]">
+                <span style="color: var(--bone-xdim);">─────</span>
+                <span class="px-1" style="color: var(--bone-xdim);">L?</span>
+              </div>
+              <div class="flex-1 flex items-center justify-center py-0.5">
+                <svg viewBox="-16 -16 32 32" class="w-7 h-7" style="color: var(--bone-xdim);">
+                  <polygon points="0,-10 8,-2 8,6 -8,6 -8,-2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                  <text x="0" y="4" text-anchor="middle" fill="currentColor" font-size="9" font-family="JetBrains Mono">?</text>
+                </svg>
+              </div>
+              <div class="font-tactical text-[8px]" style="color: var(--bone-xdim);">LOCKED</div>
+              <div class="w-full mt-1 py-0.5 text-center font-mono text-[7px]" style="background: var(--bg-1); color: var(--bone-xdim); border-top: 1px solid var(--line); letter-spacing: 0.12em;">LVL·06</div>
+            </div>
+            <div class="card-tile locked p-1.5 pt-2 flex flex-col items-center" style="aspect-ratio: 0.82;">
+              <div class="role-stripe" style="background: var(--line);"></div>
+              <div class="w-full flex justify-between items-center font-mono text-[6px]">
+                <span style="color: var(--bone-xdim);">─────</span>
+                <span class="px-1" style="color: var(--bone-xdim);">L?</span>
+              </div>
+              <div class="flex-1 flex items-center justify-center py-0.5">
+                <svg viewBox="-16 -16 32 32" class="w-7 h-7" style="color: var(--bone-xdim);">
+                  <polygon points="0,-10 8,-2 8,6 -8,6 -8,-2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                  <text x="0" y="4" text-anchor="middle" fill="currentColor" font-size="9" font-family="JetBrains Mono">?</text>
+                </svg>
+              </div>
+              <div class="font-tactical text-[8px]" style="color: var(--bone-xdim);">LOCKED</div>
+              <div class="w-full mt-1 py-0.5 text-center font-mono text-[7px]" style="background: var(--bg-1); color: var(--bone-xdim); border-top: 1px solid var(--line); letter-spacing: 0.12em;">LVL·07</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- BOTTOM DEPLOY ROW -->
+        <div class="px-3 pb-3 pt-2 relative" style="border-top: 1px solid var(--line); background: linear-gradient(180deg, transparent, rgba(5,8,17,0.6));">
+          <div class="flex items-center gap-2 mb-1.5 px-1">
+            <div class="w-1.5 h-1.5" style="background: var(--cyan); box-shadow: 0 0 4px var(--cyan);"></div>
+            <div class="font-tactical text-[8px]" style="color: var(--bone-dim); letter-spacing: 0.22em;">DEPLOY·OPS</div>
+            <div class="h-px flex-1" style="background: var(--line);"></div>
+            <div class="font-mono text-[7px]" style="color: var(--bone-xdim);">READY·3</div>
+          </div>
+
+          <div class="grid grid-cols-4 gap-1.5" style="height: 54px;">
+            <!-- TUTORIAL -->
+            <button class="btn-chamfer flex flex-col items-center justify-center px-1" style="background: var(--bg-1); border: 1px solid var(--line);">
+              <div class="font-mono text-[7px]" style="color: var(--bone-xdim); letter-spacing: 0.2em;">TRAIN</div>
+              <div class="font-tactical text-[10px] mt-0.5" style="color: var(--bone); letter-spacing: 0.1em;">TUTOR</div>
+            </button>
+            <!-- 1V1 — PRIMARY, spans 2 -->
+            <button class="btn-chamfer col-span-2 flex flex-col items-center justify-center relative pulse-glow" style="background: linear-gradient(180deg, var(--cyan-dim), var(--bg-2) 70%); border: 1px solid var(--cyan);">
+              <div class="font-mono text-[7px]" style="color: var(--cyan); letter-spacing: 0.25em;">▸ DEPLOY</div>
+              <div class="font-tactical text-[14px] mt-0.5" style="color: var(--bone); letter-spacing: 0.15em;">1V1·SOLO</div>
+            </button>
+            <!-- 2V2 -->
+            <button class="btn-chamfer flex flex-col items-center justify-center px-1" style="background: var(--bg-1); border: 1px solid var(--line);">
+              <div class="font-mono text-[7px]" style="color: var(--bone-xdim); letter-spacing: 0.2em;">SQUAD</div>
+              <div class="font-tactical text-[11px] mt-0.5" style="color: var(--bone); letter-spacing: 0.1em;">2V2</div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN 02 : MATCH HUD ============ -->
+  <section>
+    <div class="font-tactical text-[10px] mb-4 flex items-center gap-3" style="color: var(--bone-xdim); letter-spacing: 0.28em;">
+      <span style="color: var(--cyan);">02</span> MATCH·HUD / ACTIVE
+      <div class="h-px w-20" style="background: var(--line);"></div>
+    </div>
+    <div class="phone scanlines">
+      <div class="absolute inset-0 grid-underlay opacity-35"></div>
+
+      <div class="relative h-full flex flex-col">
+
+        <!-- TOP BAR -->
+        <div class="px-3 pt-2.5 pb-2 relative" style="border-bottom: 1px solid var(--line); background: rgba(10,17,33,0.6); backdrop-filter: blur(3px);">
+          <!-- exit, phase, timer -->
+          <div class="flex items-center justify-between mb-2">
+            <button class="font-tactical text-[9px] hover:opacity-70" style="color: var(--bone-dim); letter-spacing: 0.18em;">◂ EXIT</button>
+            <div class="flex flex-col items-center">
+              <div class="font-mono text-[7px]" style="color: var(--bone-xdim); letter-spacing: 0.22em;">PHASE·02</div>
+              <div class="font-tactical text-[11px] scan-pulse px-2 py-0.5 mt-0.5" style="color: var(--cyan); letter-spacing: 0.2em; background: rgba(5,8,17,0.8); border: 1px solid var(--cyan-dim); border-left: 2px solid var(--cyan);">
+                ▸ MATCH
+              </div>
+            </div>
+            <div class="flex flex-col items-end">
+              <div class="font-mono text-[7px]" style="color: var(--bone-xdim); letter-spacing: 0.15em;">T·MINUS</div>
+              <div class="font-tactical text-[16px] leading-none mt-0.5" style="color: var(--gold); letter-spacing: 0.06em;">01:23</div>
+            </div>
+          </div>
+
+          <!-- Mana bars -->
+          <div class="flex items-center gap-2">
+            <!-- player -->
+            <div class="flex-1">
+              <div class="flex items-center justify-between mb-0.5">
+                <span class="font-tactical text-[8px]" style="color: var(--cyan); letter-spacing: 0.22em;">YOU</span>
+                <span class="font-mono text-[9px] tabular-nums" style="color: var(--cyan);">06/10</span>
+              </div>
+              <div class="seg-bar" style="height: 6px;">
+                <div class="seg on"></div><div class="seg on"></div><div class="seg on"></div>
+                <div class="seg on"></div><div class="seg on"></div><div class="seg on"></div>
+                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+              </div>
+            </div>
+            <!-- opposition -->
+            <div class="flex-1">
+              <div class="flex items-center justify-between mb-0.5">
+                <span class="font-mono text-[9px] tabular-nums" style="color: var(--red);">04/10</span>
+                <span class="font-tactical text-[8px]" style="color: var(--red); letter-spacing: 0.22em;">ENEMY</span>
+              </div>
+              <div class="seg-bar red" style="height: 6px;">
+                <div class="seg on"></div><div class="seg on"></div><div class="seg on"></div><div class="seg on"></div>
+                <div class="seg"></div><div class="seg"></div><div class="seg"></div>
+                <div class="seg"></div><div class="seg"></div><div class="seg"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PLAYFIELD -->
+        <div class="flex-1 relative overflow-hidden" style="background: radial-gradient(ellipse at center top, #081224 0%, #030509 70%);">
+
+          <!-- edge labels -->
+          <div class="absolute top-2 left-2 right-2 flex justify-between items-center">
+            <div class="flex items-center gap-1">
+              <div class="w-1 h-1" style="background: var(--red);"></div>
+              <div class="font-mono text-[7px]" style="color: rgba(255,59,87,0.75); letter-spacing: 0.2em;">HOSTILE·BASE</div>
+            </div>
+            <div class="font-mono text-[7px]" style="color: rgba(255,59,87,0.45);">18×03 / 54·CELL</div>
+          </div>
+          <div class="absolute bottom-2 left-2 right-2 flex justify-between items-center z-10">
+            <div class="font-mono text-[7px]" style="color: rgba(57,240,255,0.5);">▾ DEPLOY·ZONE</div>
+            <div class="flex items-center gap-1">
+              <div class="font-mono text-[7px]" style="color: rgba(57,240,255,0.75); letter-spacing: 0.2em;">FRIENDLY·BASE</div>
+              <div class="w-1 h-1" style="background: var(--cyan);"></div>
+            </div>
+          </div>
+
+          <!-- pseudo-3D trapezoid -->
+          <svg class="absolute inset-0 w-full h-full" viewBox="0 0 360 400" preserveAspectRatio="none">
+            <!-- far (enemy) base grid hint -->
+            <g>
+              <rect x="90" y="28" width="180" height="14" fill="none" stroke="rgba(255,59,87,0.45)" stroke-width="0.8"/>
+              <line x1="150" y1="28" x2="150" y2="42" stroke="rgba(255,59,87,0.2)" stroke-width="0.5"/>
+              <line x1="210" y1="28" x2="210" y2="42" stroke="rgba(255,59,87,0.2)" stroke-width="0.5"/>
+              <line x1="90" y1="35" x2="270" y2="35" stroke="rgba(255,59,87,0.15)" stroke-width="0.5"/>
+            </g>
+            <!-- near (your) base -->
+            <g>
+              <rect x="44" y="355" width="272" height="28" fill="none" stroke="rgba(57,240,255,0.5)" stroke-width="0.8"/>
+              <line x1="134" y1="355" x2="134" y2="383" stroke="rgba(57,240,255,0.25)" stroke-width="0.5"/>
+              <line x1="226" y1="355" x2="226" y2="383" stroke="rgba(57,240,255,0.25)" stroke-width="0.5"/>
+              <line x1="44" y1="365" x2="316" y2="365" stroke="rgba(57,240,255,0.2)" stroke-width="0.5"/>
+              <line x1="44" y1="374" x2="316" y2="374" stroke="rgba(57,240,255,0.2)" stroke-width="0.5"/>
+            </g>
+            <!-- perspective lines -->
+            <line x1="44" y1="383" x2="90" y2="28" stroke="var(--line)" stroke-width="0.5" stroke-dasharray="1 4"/>
+            <line x1="316" y1="383" x2="270" y2="28" stroke="var(--line)" stroke-width="0.5" stroke-dasharray="1 4"/>
+            <!-- midline -->
+            <line x1="60" y1="195" x2="300" y2="195" stroke="var(--line-bright)" stroke-width="0.6" stroke-dasharray="2 4"/>
+            <text x="180" y="189" text-anchor="middle" fill="var(--bone-xdim)" font-size="6" font-family="JetBrains Mono" letter-spacing="2">═ MID ═</text>
+
+            <!-- walls -->
+            <rect x="80" y="230" width="80" height="4" fill="var(--cyan-dim)" opacity="0.7"/>
+            <rect x="200" y="250" width="80" height="4" fill="var(--cyan-dim)" opacity="0.5"/>
+            <rect x="120" y="140" width="70" height="3" fill="var(--red-dim)" opacity="0.7"/>
+            <rect x="220" y="155" width="70" height="3" fill="var(--red-dim)" opacity="0.6"/>
+
+            <!-- friendly units (cyan) -->
+            <g>
+              <polygon points="120,320 126,332 114,332" fill="var(--cyan)" opacity="0.95"/>
+              <polygon points="200,305 206,317 194,317" fill="var(--cyan)" opacity="0.95"/>
+              <circle cx="165" cy="275" r="6" fill="none" stroke="var(--green)" stroke-width="1.6" opacity="0.9"/>
+              <rect x="240" y="275" width="10" height="10" fill="var(--red)" opacity="0.9"/>
+            </g>
+
+            <!-- enemy units -->
+            <g>
+              <rect x="130" y="125" width="9" height="9" fill="var(--red)" opacity="0.92"/>
+              <rect x="220" y="130" width="9" height="9" fill="var(--red)" opacity="0.92"/>
+              <polygon points="180,110 185,119 175,119" fill="var(--magenta)" opacity="0.9"/>
+            </g>
+
+            <!-- projectile trails -->
+            <line x1="124" y1="320" x2="128" y2="280" stroke="var(--cyan)" stroke-width="1" opacity="0.6"/>
+            <line x1="206" y1="305" x2="220" y2="150" stroke="var(--cyan)" stroke-width="1" opacity="0.3" stroke-dasharray="2 2"/>
+
+            <!-- target reticle (card selected) -->
+            <g opacity="0.9">
+              <circle cx="180" cy="290" r="16" fill="none" stroke="var(--cyan)" stroke-width="0.8" stroke-dasharray="2 2"/>
+              <circle cx="180" cy="290" r="5" fill="none" stroke="var(--cyan)" stroke-width="0.8"/>
+              <line x1="164" y1="290" x2="158" y2="290" stroke="var(--cyan)" stroke-width="1"/>
+              <line x1="196" y1="290" x2="202" y2="290" stroke="var(--cyan)" stroke-width="1"/>
+              <line x1="180" y1="274" x2="180" y2="268" stroke="var(--cyan)" stroke-width="1"/>
+              <line x1="180" y1="306" x2="180" y2="312" stroke="var(--cyan)" stroke-width="1"/>
+            </g>
+          </svg>
+
+          <!-- Hint strip -->
+          <div class="absolute left-0 right-0 flex justify-center" style="bottom: 20px;">
+            <div class="font-tactical text-[8px] px-2 py-1" style="color: var(--cyan); background: rgba(5,8,17,0.9); border: 1px solid var(--cyan-dim); letter-spacing: 0.22em;">
+              ▾ TAP DEPLOY·ZONE
+            </div>
+          </div>
+        </div>
+
+        <!-- HAND STRIP -->
+        <div class="px-2 pt-2 pb-3" style="background: linear-gradient(180deg, rgba(5,8,17,0.85), var(--bg-0)); border-top: 1px solid var(--line);">
+          <div class="flex items-center gap-2 mb-1.5 px-1">
+            <div class="w-1.5 h-1.5" style="background: var(--cyan); box-shadow: 0 0 3px var(--cyan);"></div>
+            <div class="font-tactical text-[8px]" style="color: var(--cyan); letter-spacing: 0.22em;">HAND / 08</div>
+            <div class="h-px flex-1" style="background: var(--line);"></div>
+            <div class="font-mono text-[7px]" style="color: var(--bone-xdim); letter-spacing: 0.15em;">TAP·CARD</div>
+          </div>
+
+          <div class="flex gap-1.5">
+            <!-- hand card 1 — DART selected -->
+            <div class="flex-1 flex flex-col items-center relative p-1 pt-0.5 pb-0.5" style="background: var(--bg-2); border: 1px solid var(--cyan); box-shadow: 0 0 10px var(--cyan-glow); transform: translateY(-3px);">
+              <div class="font-tactical text-[6px]" style="color: var(--cyan); letter-spacing: 0.1em;">SHOOT</div>
+              <svg viewBox="-10 -10 20 20" class="w-5 h-5 my-0.5 shape-icon" style="color: var(--cyan);">
+                <polygon points="0,-8 7,5 -7,5" fill="currentColor"/>
+              </svg>
+              <div class="font-tactical text-[6px]" style="color: var(--bone);">DART</div>
+              <div class="absolute -top-1.5 -left-1.5 w-4 h-4 flex items-center justify-center font-mono text-[8px] font-bold" style="background: var(--gold); color: var(--bg-0); box-shadow: 0 0 4px var(--gold);">2</div>
+            </div>
+            <!-- 2 BOMB -->
+            <div class="flex-1 flex flex-col items-center relative p-1 pt-0.5 pb-0.5" style="background: var(--bg-1); border: 1px solid var(--line);">
+              <div class="font-tactical text-[6px]" style="color: var(--red); letter-spacing: 0.1em;">MELEE</div>
+              <svg viewBox="-10 -10 20 20" class="w-5 h-5 my-0.5 shape-icon" style="color: var(--red);">
+                <rect x="-7" y="-7" width="14" height="14" fill="currentColor"/>
+              </svg>
+              <div class="font-tactical text-[6px]" style="color: var(--bone);">BOMB</div>
+              <div class="absolute -top-1.5 -left-1.5 w-4 h-4 flex items-center justify-center font-mono text-[8px] font-bold" style="background: var(--gold); color: var(--bg-0);">4</div>
+            </div>
+            <!-- 3 SPIRAL -->
+            <div class="flex-1 flex flex-col items-center relative p-1 pt-0.5 pb-0.5" style="background: var(--bg-1); border: 1px solid var(--line);">
+              <div class="font-tactical text-[6px]" style="color: var(--purple); letter-spacing: 0.1em;">BREAK</div>
+              <svg viewBox="-10 -10 20 20" class="w-5 h-5 my-0.5 shape-icon" style="color: var(--purple);">
+                <path d="M 0 -7 A 7 7 0 1 1 -0.01 -7 M -4 -2 A 4 4 0 1 0 -3.99 -2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+              </svg>
+              <div class="font-tactical text-[6px]" style="color: var(--bone);">SPIRAL</div>
+              <div class="absolute -top-1.5 -left-1.5 w-4 h-4 flex items-center justify-center font-mono text-[8px] font-bold" style="background: var(--gold); color: var(--bg-0);">3</div>
+            </div>
+            <!-- 4 BURST -->
+            <div class="flex-1 flex flex-col items-center relative p-1 pt-0.5 pb-0.5" style="background: var(--bg-1); border: 1px solid var(--line);">
+              <div class="font-tactical text-[6px]" style="color: var(--gold); letter-spacing: 0.1em;">INTCP</div>
+              <svg viewBox="-10 -10 20 20" class="w-5 h-5 my-0.5 shape-icon" style="color: var(--gold);">
+                <polygon points="0,-7 2,-2 7,-2 3,2 5,7 0,3 -5,7 -3,2 -7,-2 -2,-2" fill="currentColor"/>
+              </svg>
+              <div class="font-tactical text-[6px]" style="color: var(--bone);">BURST</div>
+              <div class="absolute -top-1.5 -left-1.5 w-4 h-4 flex items-center justify-center font-mono text-[8px] font-bold" style="background: var(--gold); color: var(--bg-0);">3</div>
+            </div>
+            <!-- 5 LANCE -->
+            <div class="flex-1 flex flex-col items-center relative p-1 pt-0.5 pb-0.5" style="background: var(--bg-1); border: 1px solid var(--line);">
+              <div class="font-tactical text-[6px]" style="color: var(--cyan); letter-spacing: 0.1em;">SNIPE</div>
+              <svg viewBox="-10 -10 20 20" class="w-5 h-5 my-0.5 shape-icon" style="color: var(--cyan);">
+                <polygon points="0,-7 7,0 0,7 -7,0" fill="currentColor"/>
+              </svg>
+              <div class="font-tactical text-[6px]" style="color: var(--bone);">LANCE</div>
+              <div class="absolute -top-1.5 -left-1.5 w-4 h-4 flex items-center justify-center font-mono text-[8px] font-bold" style="background: var(--gold); color: var(--bg-0);">5</div>
+            </div>
+            <!-- 6 ORB (unaffordable) -->
+            <div class="flex-1 flex flex-col items-center relative p-1 pt-0.5 pb-0.5 opacity-40" style="background: var(--bg-1); border: 1px solid var(--line);">
+              <div class="font-tactical text-[6px]" style="color: var(--green); letter-spacing: 0.1em;">SHOOT</div>
+              <svg viewBox="-10 -10 20 20" class="w-5 h-5 my-0.5 shape-icon" style="color: var(--green);">
+                <circle cx="0" cy="0" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/>
+              </svg>
+              <div class="font-tactical text-[6px]" style="color: var(--bone);">ORB</div>
+              <div class="absolute -top-1.5 -left-1.5 w-4 h-4 flex items-center justify-center font-mono text-[8px] font-bold" style="background: var(--bone-xdim); color: var(--bg-0);">7</div>
+            </div>
+            <!-- 7 CHEVRON -->
+            <div class="flex-1 flex flex-col items-center relative p-1 pt-0.5 pb-0.5" style="background: var(--bg-1); border: 1px solid var(--line);">
+              <div class="font-tactical text-[6px]" style="color: var(--magenta); letter-spacing: 0.1em;">SWARM</div>
+              <svg viewBox="-10 -10 20 20" class="w-5 h-5 my-0.5 shape-icon" style="color: var(--magenta);">
+                <path d="M -7,-3 L 0,4 L 7,-3 L 5,-5 L 0,0 L -5,-5 Z" fill="currentColor"/>
+              </svg>
+              <div class="font-tactical text-[6px]" style="color: var(--bone);">CHEVRON</div>
+              <div class="absolute -top-1.5 -left-1.5 w-4 h-4 flex items-center justify-center font-mono text-[8px] font-bold" style="background: var(--gold); color: var(--bg-0);">4</div>
+            </div>
+            <!-- 8 PULSE -->
+            <div class="flex-1 flex flex-col items-center relative p-1 pt-0.5 pb-0.5" style="background: var(--bg-1); border: 1px solid var(--line);">
+              <div class="font-tactical text-[6px]" style="color: var(--purple); letter-spacing: 0.1em;">INTCP</div>
+              <svg viewBox="-10 -10 20 20" class="w-5 h-5 my-0.5 shape-icon" style="color: var(--purple);">
+                <circle cx="0" cy="0" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="0" cy="0" r="3" fill="currentColor"/>
+              </svg>
+              <div class="font-tactical text-[6px]" style="color: var(--bone);">PULSE</div>
+              <div class="absolute -top-1.5 -left-1.5 w-4 h-4 flex items-center justify-center font-mono text-[8px] font-bold" style="background: var(--gold); color: var(--bg-0);">5</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ==================================================
+     DESIGN TOKENS
+     ================================================== -->
+<footer class="max-w-5xl mx-auto mt-20 pt-10" style="border-top: 1px solid var(--line);">
+  <div class="flex items-center gap-3 mb-6">
+    <div class="w-1.5 h-1.5" style="background: var(--cyan);"></div>
+    <div class="font-tactical text-[10px]" style="color: var(--bone-dim); letter-spacing: 0.28em;">DESIGN TOKENS / PORTING SHEET</div>
+    <div class="h-px flex-1" style="background: var(--line);"></div>
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-6 text-[11px]">
+    <div>
+      <div class="font-tactical mb-2" style="color: var(--cyan); letter-spacing: 0.22em;">BG</div>
+      <div class="flex items-center gap-2 mb-1"><div class="w-5 h-5" style="background: #050811;"></div><span class="font-mono" style="color: var(--bone-dim);">#050811 BG·0</span></div>
+      <div class="flex items-center gap-2 mb-1"><div class="w-5 h-5" style="background: #0A1121;"></div><span class="font-mono" style="color: var(--bone-dim);">#0A1121 BG·1</span></div>
+      <div class="flex items-center gap-2 mb-1"><div class="w-5 h-5" style="background: #101A34;"></div><span class="font-mono" style="color: var(--bone-dim);">#101A34 BG·2</span></div>
+      <div class="flex items-center gap-2"><div class="w-5 h-5" style="background: #18244A;"></div><span class="font-mono" style="color: var(--bone-dim);">#18244A BG·3</span></div>
+    </div>
+    <div>
+      <div class="font-tactical mb-2" style="color: var(--cyan); letter-spacing: 0.22em;">CYAN</div>
+      <div class="flex items-center gap-2 mb-1"><div class="w-5 h-5" style="background: #39F0FF;"></div><span class="font-mono" style="color: var(--bone-dim);">#39F0FF cyan</span></div>
+      <div class="flex items-center gap-2 mb-1"><div class="w-5 h-5" style="background: #18A9BD;"></div><span class="font-mono" style="color: var(--bone-dim);">#18A9BD mid</span></div>
+      <div class="flex items-center gap-2"><div class="w-5 h-5" style="background: #1C6A7A;"></div><span class="font-mono" style="color: var(--bone-dim);">#1C6A7A dim</span></div>
+    </div>
+    <div>
+      <div class="font-tactical mb-2" style="color: var(--cyan); letter-spacing: 0.22em;">GOLD / RED</div>
+      <div class="flex items-center gap-2 mb-1"><div class="w-5 h-5" style="background: #FFB020;"></div><span class="font-mono" style="color: var(--bone-dim);">#FFB020 gold</span></div>
+      <div class="flex items-center gap-2 mb-1"><div class="w-5 h-5" style="background: #FF3B57;"></div><span class="font-mono" style="color: var(--bone-dim);">#FF3B57 red</span></div>
+      <div class="flex items-center gap-2"><div class="w-5 h-5" style="background: #4AE67A;"></div><span class="font-mono" style="color: var(--bone-dim);">#4AE67A green</span></div>
+    </div>
+    <div>
+      <div class="font-tactical mb-2" style="color: var(--cyan); letter-spacing: 0.22em;">TEXT</div>
+      <div class="flex items-center gap-2 mb-1"><div class="w-5 h-5" style="background: #F2EEE6;"></div><span class="font-mono" style="color: var(--bone-dim);">#F2EEE6 bone</span></div>
+      <div class="flex items-center gap-2 mb-1"><div class="w-5 h-5" style="background: #7E89A4;"></div><span class="font-mono" style="color: var(--bone-dim);">#7E89A4 dim</span></div>
+      <div class="flex items-center gap-2"><div class="w-5 h-5" style="background: #4A5472;"></div><span class="font-mono" style="color: var(--bone-dim);">#4A5472 xdim</span></div>
+    </div>
+    <div>
+      <div class="font-tactical mb-2" style="color: var(--cyan); letter-spacing: 0.22em;">TYPE</div>
+      <div class="mb-1"><span class="font-tactical" style="color: var(--bone);">Michroma</span> <span class="font-mono text-[8px]" style="color: var(--bone-xdim);">display</span></div>
+      <div class="mb-1"><span class="font-mono" style="color: var(--bone);">JetBrains Mono</span> <span class="font-mono text-[8px]" style="color: var(--bone-xdim);">body</span></div>
+      <div class="font-mono text-[9px] mt-2" style="color: var(--bone-xdim);">tnum, tabular</div>
+      <div class="font-mono text-[9px]" style="color: var(--bone-xdim);">letterspace 0.1–0.3em</div>
+    </div>
+  </div>
+
+  <div class="mt-10 font-mono text-[9px] flex items-center gap-3" style="color: var(--bone-xdim);">
+    <span>░░░</span>
+    <span>EOT / END·OF·TERMINAL</span>
+    <div class="h-px flex-1" style="background: var(--line);"></div>
+    <span>VEC·0001</span>
+  </div>
+</footer>
+
+</body>
+</html>

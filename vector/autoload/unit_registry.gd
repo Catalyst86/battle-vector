@@ -3,8 +3,10 @@ extends Node
 ## Consumers read the arrays directly instead of calling get_nodes_in_group()
 ## each frame, which would allocate a new Array on every call.
 ##
-## Arrays are intentionally untyped to avoid a hard Unit/UnitRegistry circular
-## type dependency. Callers duck-type on .card / .world_pos / .is_enemy.
+## Queries take a `bool is_enemy` rather than a node so non-Unit callers
+## (projectiles — which use `owner_enemy` — and future team-scoped tools)
+## don't need a matching `is_enemy` property. Arrays stay untyped so the
+## autoload doesn't pull in the Unit class_name.
 
 var player_team: Array = []
 var enemy_team: Array = []
@@ -26,17 +28,19 @@ func unregister(u: Node) -> void:
 	player_buffers.erase(u)
 	enemy_buffers.erase(u)
 
-## Opposing team from `u`'s perspective.
-func enemies_of(u: Node) -> Array:
-	return player_team if u.is_enemy else enemy_team
+## Opposing team from the caller's perspective. Pass the caller's own
+## enemy-flag (Unit.is_enemy or Projectile.owner_enemy).
+func enemies_of(is_enemy: bool) -> Array:
+	return player_team if is_enemy else enemy_team
 
-## Same team as `u`. Includes `u` — callers skip self themselves.
-func allies_of(u: Node) -> Array:
-	return enemy_team if u.is_enemy else player_team
+## Same team as the caller. Includes the caller itself — skip self at the
+## caller site.
+func allies_of(is_enemy: bool) -> Array:
+	return enemy_team if is_enemy else player_team
 
 ## Friendly BUFFER-role units, used by _refresh_effective_damage.
-func buffers_for(u: Node) -> Array:
-	return enemy_buffers if u.is_enemy else player_buffers
+func buffers_for(is_enemy: bool) -> Array:
+	return enemy_buffers if is_enemy else player_buffers
 
 ## Nuke all four lists. Called by match.gd on _ready as a safety net in case
 ## a previous match left stale references (normally _exit_tree handles this).

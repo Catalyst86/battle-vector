@@ -45,6 +45,7 @@ func _load() -> void:
 	if data == null:
 		data = PlayerProfileData.new()
 	_ensure_levels()
+	_apply_audio()
 
 func _ensure_levels() -> void:
 	# Make sure every card in the pool has a level entry. New cards added
@@ -100,26 +101,41 @@ func award_match_result(result: String) -> Dictionary:
 	var gold_delta: int = 0
 	var trophy_delta: int = 0
 	var xp_delta: int = 0
+	var history_token: String = ""
 	match result:
 		"VICTORY":
 			gold_delta = WIN_GOLD
 			trophy_delta = WIN_TROPHIES
 			xp_delta = WIN_XP
 			data.wins += 1
+			history_token = "W"
+			if DailyOps != null:
+				DailyOps.track(&"win_matches", 1)
 		"DEFEAT":
 			gold_delta = LOSS_GOLD
 			trophy_delta = LOSS_TROPHIES
 			xp_delta = LOSS_XP
 			data.losses += 1
+			history_token = "L"
 		"DRAW":
 			gold_delta = DRAW_GOLD
 			trophy_delta = DRAW_TROPHIES
 			xp_delta = DRAW_XP
 			data.draws += 1
+			history_token = "D"
+	# Match history ring — keep last 5, oldest first.
+	if history_token != "":
+		data.match_history.append(history_token)
+		while data.match_history.size() > 5:
+			data.match_history.pop_front()
 	award(gold_delta, trophy_delta)
 	if data.trophies > data.best_trophies:
 		data.best_trophies = data.trophies
 	var levels_gained := award_xp(xp_delta)
+	# Season XP is 1:1 with player XP for now — every match advances both
+	# tracks. Tweak the multiplier if the season track needs to feel slower.
+	if SeasonPass != null and xp_delta > 0:
+		SeasonPass.award_xp(xp_delta)
 	return {"gold": gold_delta, "trophies": trophy_delta, "xp": xp_delta, "levels": levels_gained}
 
 # --- Player XP / level ------------------------------------------------------
@@ -235,3 +251,52 @@ func claim_free_chest() -> Dictionary:
 	data.last_free_chest_ts = int(Time.get_unix_time_from_system())
 	var levels := award_xp(xp_delta)
 	return {"gold": gold_delta, "xp": xp_delta, "levels": levels}
+
+# --- Audio ------------------------------------------------------------------
+
+## Push the saved music/sfx/mute values into the AudioServer bus volumes.
+## Safe to call before buses exist (get_bus_index returns -1 and we skip).
+func _apply_audio() -> void:
+	var music_idx := AudioServer.get_bus_index(&"Music")
+	var sfx_idx := AudioServer.get_bus_index(&"SFX")
+	var muted: bool = data.audio_muted
+	if music_idx >= 0:
+		var v: float = maxf(0.0001, data.music_volume)
+		AudioServer.set_bus_volume_db(music_idx, linear_to_db(v))
+		AudioServer.set_bus_mute(music_idx, muted or data.music_volume <= 0.0)
+	if sfx_idx >= 0:
+		var v: float = maxf(0.0001, data.sfx_volume)
+		AudioServer.set_bus_volume_db(sfx_idx, linear_to_db(v))
+		AudioServer.set_bus_mute(sfx_idx, muted or data.sfx_volume <= 0.0)
+
+func set_music_volume(v: float) -> void:
+	data.music_volume = clampf(v, 0.0, 1.0)
+	_apply_audio()
+	save()
+
+func set_sfx_volume(v: float) -> void:
+	data.sfx_volume = clampf(v, 0.0, 1.0)
+	_apply_audio()
+	save()
+
+func set_audio_muted(b: bool) -> void:
+	data.audio_muted = b
+	_apply_audio()
+	save()
+
+# --- Graphics toggles -------------------------------------------------------
+
+func set_scanlines_enabled(b: bool) -> void:
+	data.scanlines_enabled = b
+	save()
+
+func set_screen_shake_enabled(b: bool) -> void:
+	data.screen_shake_enabled = b
+	save()
+
+func set_player_name(new_name: String) -> void:
+	var trimmed: String = new_name.strip_edges().substr(0, 16)
+	if trimmed == "":
+		return
+	data.player_name = trimmed
+	save()

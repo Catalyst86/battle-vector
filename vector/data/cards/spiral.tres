@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1")
 id = &"spiral"
+rarity = &"rare"
 display_name = "Spiral"
 shape = 7
 role = 2

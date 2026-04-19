@@ -50,7 +50,9 @@ func _refresh() -> void:
 		upgrade_btn.text = "MAX"
 		upgrade_btn.disabled = true
 	else:
-		upgrade_btn.text = "▲ %d" % cost
+		# Plain-ASCII label — the ▲ glyph doesn't render on every Android
+		# font fallback and would leave the button looking like a blank bar.
+		upgrade_btn.text = "UP %d" % cost
 		upgrade_btn.disabled = not PlayerProfile.can_upgrade(card.id)
 	queue_redraw()
 

@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"beam"
+display_name = "Beam"
+shape = 2
+role = 4
+color = Color(0.957, 0.447, 0.714, 1)
+description = "Fast-fire piercing sniper. Low damage per shot."
+unlock_level = 8
+cost = 6
+hp = 22.0
+damage = 12.0
+speed = 0.0
+attack_range = 300.0
+fire_rate = 0.3
+size = 14.0
+pierces = true

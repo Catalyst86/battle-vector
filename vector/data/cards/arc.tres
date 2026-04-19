@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"arc"
+display_name = "Arc"
+shape = 0
+role = 0
+color = Color(0.024, 0.714, 0.831, 1)
+description = "Mid-range shooter. Arcing bolts."
+unlock_level = 5
+cost = 3
+hp = 22.0
+damage = 12.0
+speed = 35.0
+attack_range = 180.0
+fire_rate = 1.0
+size = 14.0

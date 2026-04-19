@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"pulse"
+display_name = "Pulse"
+shape = 4
+role = 3
+color = Color(0.655, 0.545, 0.980, 1)
+description = "Hunts enemies. Shockwave on kill."
+cost = 5
+hp = 45.0
+damage = 20.0
+speed = 45.0
+attack_range = 50.0
+fire_rate = 0.0
+size = 22.0
+swarm_count = 0
+on_death_shockwave_radius = 60.0
+on_death_shockwave_damage = 10.0

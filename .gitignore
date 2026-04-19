@@ -1,0 +1,38 @@
+# --- Godot 4 ---------------------------------------------------------------
+# Editor cache + imported resources — regenerated on every import.
+vector/.godot/
+
+# Godot occasionally leaves these around; safe to ignore.
+*.tmp
+*.translation
+
+# Export presets may contain signing-key paths / keystore creds. Commit
+# .cfg if your team shares preset configs, otherwise keep out.
+# export_presets.cfg
+# .import/
+
+# --- Build outputs ---------------------------------------------------------
+/builds/
+/exports/
+*.apk
+*.aab
+*.ipa
+*.pck
+*.zip
+
+# --- OS noise --------------------------------------------------------------
+.DS_Store
+thumbs.db
+desktop.ini
+
+# --- Editor noise ----------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Local-only notes ------------------------------------------------------
+# Anything matching *.local.md stays on your machine only.
+*.local.md
+.claude/

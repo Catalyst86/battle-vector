@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"grenade"
+display_name = "Grenade"
+shape = 1
+role = 1
+color = Color(0.937, 0.267, 0.267, 1)
+description = "Heavy AoE detonation. 60-unit blast."
+unlock_level = 5
+cost = 5
+hp = 60.0
+damage = 30.0
+speed = 30.0
+attack_range = 22.0
+fire_rate = 0.0
+size = 22.0
+melee_aoe_radius = 60.0

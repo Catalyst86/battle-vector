@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="GameMode" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/game_mode.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"tutorial"
+display_name = "TUTORIAL"
+description = "Learn the basics. No enemy units — just practice deploying and destroying the enemy base."
+team_size = 1
+networked = false
+is_tutorial = true

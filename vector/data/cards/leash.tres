@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"leash"
+display_name = "Leash"
+shape = 4
+role = 3
+color = Color(0.753, 0.518, 0.988, 1)
+description = "Interceptor. Extended reach; harasses multiple targets."
+unlock_level = 8
+cost = 5
+hp = 40.0
+damage = 18.0
+speed = 55.0
+attack_range = 50.0
+fire_rate = 0.0
+size = 16.0

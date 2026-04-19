@@ -1,0 +1,212 @@
+[gd_scene load_steps=19 format=3]
+
+[ext_resource type="Script" path="res://scripts/match/match.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/match/playfield.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/match/base_grid.gd" id="3"]
+[ext_resource type="PackedScene" path="res://scenes/ui/card_hand.tscn" id="4"]
+[ext_resource type="PackedScene" path="res://scenes/ui/mana_bar.tscn" id="5"]
+[ext_resource type="Script" path="res://scripts/match/deploy_preview.gd" id="6"]
+[ext_resource type="PackedScene" path="res://scenes/match/game_over.tscn" id="7"]
+[ext_resource type="PackedScene" path="res://scenes/match/particles.tscn" id="8"]
+[ext_resource type="PackedScene" path="res://scenes/match/tutorial_coach.tscn" id="9"]
+[ext_resource type="Resource" path="res://data/cards/dart.tres" id="10"]
+[ext_resource type="Resource" path="res://data/cards/bomb.tres" id="11"]
+[ext_resource type="Resource" path="res://data/cards/spiral.tres" id="12"]
+[ext_resource type="Resource" path="res://data/cards/burst.tres" id="13"]
+[ext_resource type="Resource" path="res://data/cards/lance.tres" id="14"]
+[ext_resource type="Resource" path="res://data/cards/orb.tres" id="15"]
+[ext_resource type="Resource" path="res://data/cards/chevron.tres" id="16"]
+[ext_resource type="Resource" path="res://data/cards/pulse.tres" id="17"]
+[ext_resource type="Shader" path="res://shaders/vignette.gdshader" id="18"]
+
+[sub_resource type="ShaderMaterial" id="VignetteMaterial"]
+shader = ExtResource("18")
+shader_parameter/intensity = 0.42
+shader_parameter/feather = 0.85
+shader_parameter/tint = Color(0, 0, 0, 1)
+
+[node name="Match" type="Node2D"]
+script = ExtResource("1")
+deck = [ExtResource("10"), ExtResource("11"), ExtResource("12"), ExtResource("13"), ExtResource("14"), ExtResource("15"), ExtResource("16"), ExtResource("17")]
+
+[node name="Background" type="ColorRect" parent="."]
+offset_right = 360.0
+offset_bottom = 780.0
+color = Color(0.023, 0.031, 0.043, 1)
+mouse_filter = 2
+
+[node name="Playfield" type="Node2D" parent="."]
+script = ExtResource("2")
+
+[node name="EnemyBase" type="Node2D" parent="Playfield"]
+script = ExtResource("3")
+side = 1
+
+[node name="PlayerBase" type="Node2D" parent="Playfield"]
+script = ExtResource("3")
+side = 0
+
+[node name="Particles" parent="Playfield" instance=ExtResource("8")]
+
+[node name="UnitsLayer" type="Node2D" parent="Playfield"]
+
+[node name="DeployPreview" type="Node2D" parent="Playfield"]
+script = ExtResource("6")
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="TopHUD" type="Control" parent="HUD"]
+layout_mode = 3
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 44.0
+mouse_filter = 2
+
+[node name="EnemyLabel" type="Label" parent="HUD/TopHUD"]
+offset_left = 12.0
+offset_top = 10.0
+offset_right = 170.0
+offset_bottom = 26.0
+theme_override_colors/font_color = Color(0.984, 0.443, 0.522, 0.9)
+theme_override_font_sizes/font_size = 11
+text = "ENEMY // K.VOID_07"
+
+[node name="PhaseLabel" type="Label" parent="HUD/TopHUD"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 4.0
+offset_bottom = 20.0
+theme_override_colors/font_color = Color(0.898, 0.906, 0.922, 0.6)
+theme_override_font_sizes/font_size = 9
+text = "MATCH"
+horizontal_alignment = 1
+
+[node name="TimerLabel" type="Label" parent="HUD/TopHUD"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 18.0
+offset_bottom = 40.0
+theme_override_colors/font_color = Color(0.898, 0.906, 0.922, 1)
+theme_override_font_sizes/font_size = 16
+text = "3:00"
+horizontal_alignment = 1
+
+[node name="EnemyManaLabel" type="Label" parent="HUD/TopHUD"]
+unique_name_in_owner = true
+offset_left = 220.0
+offset_top = 10.0
+offset_right = 348.0
+offset_bottom = 26.0
+theme_override_colors/font_color = Color(0.984, 0.749, 0.141, 1)
+theme_override_font_sizes/font_size = 11
+text = "⚡ 0/10"
+horizontal_alignment = 2
+
+[node name="BottomHUD" type="Control" parent="HUD"]
+layout_mode = 3
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -200.0
+mouse_filter = 2
+
+[node name="PlayerRow" type="HBoxContainer" parent="HUD/BottomHUD"]
+offset_left = 12.0
+offset_top = 10.0
+offset_right = 348.0
+offset_bottom = 26.0
+theme_override_constants/separation = 12
+
+[node name="PlayerLabel" type="Label" parent="HUD/BottomHUD/PlayerRow"]
+custom_minimum_size = Vector2(120, 0)
+theme_override_colors/font_color = Color(0.404, 0.910, 0.976, 0.9)
+theme_override_font_sizes/font_size = 11
+text = "YOU // VEC.BLUE"
+
+[node name="ManaLabel" type="Label" parent="HUD/BottomHUD/PlayerRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(70, 0)
+theme_override_colors/font_color = Color(0.984, 0.749, 0.141, 1)
+theme_override_font_sizes/font_size = 11
+text = "⚡ 6/10"
+horizontal_alignment = 2
+
+[node name="ManaBar" parent="HUD/BottomHUD" instance=ExtResource("5")]
+unique_name_in_owner = true
+offset_left = 12.0
+offset_top = 32.0
+offset_right = 348.0
+offset_bottom = 40.0
+
+[node name="HintLabel" type="Label" parent="HUD/BottomHUD"]
+unique_name_in_owner = true
+offset_left = 12.0
+offset_top = 52.0
+offset_right = 348.0
+offset_bottom = 68.0
+theme_override_colors/font_color = Color(0.898, 0.906, 0.922, 0.55)
+theme_override_font_sizes/font_size = 10
+text = "TAP A CARD"
+horizontal_alignment = 1
+
+[node name="Hand" parent="HUD/BottomHUD" instance=ExtResource("4")]
+unique_name_in_owner = true
+offset_left = 0.0
+offset_top = 78.0
+offset_right = 360.0
+offset_bottom = 146.0
+deck = [ExtResource("10"), ExtResource("11"), ExtResource("12"), ExtResource("13"), ExtResource("14"), ExtResource("15"), ExtResource("16"), ExtResource("17")]
+
+[node name="WallToggle" type="Button" parent="HUD/BottomHUD"]
+unique_name_in_owner = true
+offset_left = 12.0
+offset_top = 150.0
+offset_right = 92.0
+offset_bottom = 180.0
+theme_override_font_sizes/font_size = 10
+text = "▭ WALL 0/3"
+
+[node name="BackButton" type="Button" parent="HUD/BottomHUD"]
+unique_name_in_owner = true
+offset_left = 148.0
+offset_top = 150.0
+offset_right = 212.0
+offset_bottom = 180.0
+theme_override_font_sizes/font_size = 10
+text = "◂ MENU"
+
+[node name="StartMatchButton" type="Button" parent="HUD/BottomHUD"]
+unique_name_in_owner = true
+offset_left = 232.0
+offset_top = 150.0
+offset_right = 348.0
+offset_bottom = 180.0
+theme_override_font_sizes/font_size = 10
+text = "▸ START MATCH"
+
+[node name="Vignette" type="CanvasLayer" parent="."]
+layer = 3
+
+[node name="VignetteRect" type="ColorRect" parent="Vignette"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+material = SubResource("VignetteMaterial")
+
+[node name="TutorialLayer" type="CanvasLayer" parent="."]
+layer = 25
+
+[node name="TutorialCoach" parent="TutorialLayer" instance=ExtResource("9")]
+unique_name_in_owner = true
+
+[node name="Overlay" type="CanvasLayer" parent="."]
+layer = 50
+
+[node name="GameOver" parent="Overlay" instance=ExtResource("7")]
+unique_name_in_owner = true

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"spiral"
+display_name = "Spiral"
+shape = 7
+role = 2
+color = Color(0.753, 0.518, 0.988, 1)
+description = "Bores through walls. Ignores units."
+cost = 3
+hp = 35.0
+damage = 18.0
+speed = 30.0
+attack_range = 24.0
+fire_rate = 0.0
+size = 18.0
+swarm_count = 0

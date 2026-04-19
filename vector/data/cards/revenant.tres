@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="2"]
+[ext_resource type="Resource" path="res://data/cards/_scout.tres" id="3"]
+
+[resource]
+script = ExtResource("2")
+id = &"revenant"
+display_name = "Revenant"
+shape = 5
+role = 1
+color = Color(0.659, 0.333, 0.969, 1)
+description = "Heavy brawler. On death, spawns a Scout that keeps pushing."
+unlock_level = 10
+cost = 6
+hp = 70.0
+damage = 40.0
+speed = 30.0
+attack_range = 20.0
+fire_rate = 0.0
+size = 20.0
+on_death_spawn = ExtResource("3")

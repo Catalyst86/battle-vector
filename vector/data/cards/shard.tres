@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"shard"
+display_name = "Shard"
+shape = 5
+role = 0
+color = Color(0.984, 0.749, 0.141, 1)
+description = "Spread shooter. Fires 3 bolts in a fan."
+unlock_level = 6
+cost = 4
+hp = 25.0
+damage = 6.0
+speed = 40.0
+attack_range = 120.0
+fire_rate = 0.5
+size = 14.0
+projectile_count = 3
+projectile_spread_deg = 15.0

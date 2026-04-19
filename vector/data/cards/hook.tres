@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"hook"
+display_name = "Hook"
+shape = 6
+role = 3
+color = Color(0.925, 0.282, 0.600, 1)
+description = "Fast chaser. Catches up to fleeing units."
+unlock_level = 3
+cost = 3
+hp = 28.0
+damage = 10.0
+speed = 80.0
+attack_range = 35.0
+fire_rate = 0.0
+size = 14.0

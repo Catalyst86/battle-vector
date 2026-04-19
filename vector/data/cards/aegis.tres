@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"aegis"
+display_name = "Aegis"
+shape = 4
+role = 7
+color = Color(0.745, 0.945, 0.388, 1)
+description = "Stationary. Regen aura — heals + buffs allies."
+unlock_level = 9
+cost = 4
+hp = 70.0
+damage = 0.0
+speed = 0.0
+attack_range = 0.0
+fire_rate = 0.0
+size = 16.0
+aura_radius = 70.0
+aura_damage_mult = 0.15
+aura_heal_per_sec = 2.0

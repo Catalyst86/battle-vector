@@ -1,0 +1,335 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/menus/main_menu.gd" id="1"]
+
+[node name="Home" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.023, 0.031, 0.043, 1)
+
+[node name="Header" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 16.0
+offset_top = 28.0
+offset_right = -16.0
+offset_bottom = 130.0
+theme_override_constants/separation = 4
+
+[node name="IdentityRow" type="HBoxContainer" parent="Header"]
+layout_mode = 2
+
+[node name="PlayerName" type="Label" parent="Header/IdentityRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.404, 0.910, 0.976, 1)
+theme_override_font_sizes/font_size = 13
+text = "YOU // VEC.BLUE"
+
+[node name="GoldLabel" type="Label" parent="Header/IdentityRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.984, 0.749, 0.141, 1)
+theme_override_font_sizes/font_size = 13
+text = "⚡ 0 GOLD"
+horizontal_alignment = 2
+
+[node name="TrophyLabel" type="Label" parent="Header"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.898, 0.906, 0.922, 0.75)
+theme_override_font_sizes/font_size = 11
+text = "🏆 0  //  ARENA 1 — GROUND ZERO"
+
+[node name="LevelRow" type="HBoxContainer" parent="Header"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="LevelLabel" type="Label" parent="Header/LevelRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.898, 0.906, 0.922, 0.9)
+theme_override_font_sizes/font_size = 10
+text = "LEVEL 1"
+
+[node name="XpBar" type="ProgressBar" parent="Header/LevelRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 12)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+show_percentage = false
+
+[node name="XpText" type="Label" parent="Header/LevelRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.898, 0.906, 0.922, 0.55)
+theme_override_font_sizes/font_size = 9
+text = "0 / 200 XP"
+horizontal_alignment = 2
+
+[node name="HeaderDivider" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 16.0
+offset_top = 138.0
+offset_right = -16.0
+offset_bottom = 139.0
+color = Color(1, 1, 1, 0.12)
+
+[node name="Tabs" type="TabContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = 148.0
+offset_right = -8.0
+offset_bottom = -76.0
+theme_override_font_sizes/font_size = 11
+
+[node name="COLLECTION" type="ScrollContainer" parent="Tabs"]
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="CollectionGrid" type="GridContainer" parent="Tabs/COLLECTION"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+columns = 4
+theme_override_constants/h_separation = 6
+theme_override_constants/v_separation = 8
+
+[node name="DECK" type="VBoxContainer" parent="Tabs"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="DeckCaption" type="Label" parent="Tabs/DECK"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.898, 0.906, 0.922, 0.6)
+theme_override_font_sizes/font_size = 10
+text = "CURRENT DECK (8/8)"
+horizontal_alignment = 1
+
+[node name="DeckRow" type="HBoxContainer" parent="Tabs/DECK"]
+unique_name_in_owner = true
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 4
+
+[node name="EditDeckButton" type="Button" parent="Tabs/DECK"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "▸ EDIT DECK"
+
+[node name="DeckHint" type="Label" parent="Tabs/DECK"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.898, 0.906, 0.922, 0.4)
+theme_override_font_sizes/font_size = 9
+text = "Cards must be unlocked at your current LEVEL to be picked."
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="LADDER" type="VBoxContainer" parent="Tabs"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="LadderTrophyLabel" type="Label" parent="Tabs/LADDER"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.984, 0.749, 0.141, 1)
+theme_override_font_sizes/font_size = 22
+text = "🏆 0"
+horizontal_alignment = 1
+
+[node name="LadderArenaLabel" type="Label" parent="Tabs/LADDER"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.404, 0.910, 0.976, 1)
+theme_override_font_sizes/font_size = 12
+text = "ARENA 1 — GROUND ZERO"
+horizontal_alignment = 1
+
+[node name="LadderProgressBar" type="ProgressBar" parent="Tabs/LADDER"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+show_percentage = false
+
+[node name="LadderProgressLabel" type="Label" parent="Tabs/LADDER"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.898, 0.906, 0.922, 0.6)
+theme_override_font_sizes/font_size = 10
+text = "0 / 100 → ARENA 2"
+horizontal_alignment = 1
+
+[node name="Spacer1" type="Control" parent="Tabs/LADDER"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+
+[node name="LadderRecordLabel" type="Label" parent="Tabs/LADDER"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.898, 0.906, 0.922, 0.8)
+theme_override_font_sizes/font_size = 11
+text = "RECORD: 0 🏆"
+horizontal_alignment = 1
+
+[node name="LadderStatsLabel" type="Label" parent="Tabs/LADDER"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.898, 0.906, 0.922, 0.6)
+theme_override_font_sizes/font_size = 10
+text = "NO MATCHES PLAYED YET"
+horizontal_alignment = 1
+
+[node name="Spacer2" type="Control" parent="Tabs/LADDER"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+
+[node name="ArenaCaption" type="Label" parent="Tabs/LADDER"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.898, 0.906, 0.922, 0.4)
+theme_override_font_sizes/font_size = 9
+text = "▾ ARENA PROGRESSION"
+horizontal_alignment = 1
+
+[node name="ArenaScroll" type="ScrollContainer" parent="Tabs/LADDER"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="ArenaList" type="VBoxContainer" parent="Tabs/LADDER/ArenaScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+
+[node name="SHOP" type="VBoxContainer" parent="Tabs"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ShopGoldLabel" type="Label" parent="Tabs/SHOP"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.984, 0.749, 0.141, 1)
+theme_override_font_sizes/font_size = 14
+text = "GOLD: 0"
+horizontal_alignment = 1
+
+[node name="ChestCard" type="PanelContainer" parent="Tabs/SHOP"]
+layout_mode = 2
+
+[node name="ChestBox" type="VBoxContainer" parent="Tabs/SHOP/ChestCard"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ChestTitle" type="Label" parent="Tabs/SHOP/ChestCard/ChestBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.404, 0.910, 0.976, 1)
+theme_override_font_sizes/font_size = 12
+text = "⛁ DAILY FREE CHEST"
+horizontal_alignment = 1
+
+[node name="ChestStatus" type="Label" parent="Tabs/SHOP/ChestCard/ChestBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.525, 0.937, 0.674, 1)
+theme_override_font_sizes/font_size = 9
+text = "READY"
+horizontal_alignment = 1
+
+[node name="ChestDesc" type="Label" parent="Tabs/SHOP/ChestCard/ChestBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.898, 0.906, 0.922, 0.55)
+theme_override_font_sizes/font_size = 9
+text = "80–160 GOLD + 30–80 XP — every 24h"
+horizontal_alignment = 1
+
+[node name="ChestButton" type="Button" parent="Tabs/SHOP/ChestCard/ChestBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 34)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "▸ CLAIM DAILY CHEST"
+
+[node name="ChestResult" type="Label" parent="Tabs/SHOP/ChestCard/ChestBox"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.984, 0.749, 0.141, 1)
+theme_override_font_sizes/font_size = 10
+text = ""
+horizontal_alignment = 1
+
+[node name="ComingSoonLabel" type="Label" parent="Tabs/SHOP"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.898, 0.906, 0.922, 0.35)
+theme_override_font_sizes/font_size = 9
+text = "// MORE COMING SOON //
+
+GEM CHESTS · SPECIAL CARD DEALS · COSMETIC SKINS
+EARN GOLD + XP IN MATCHES.
+SPEND GOLD IN COLLECTION → UPGRADE CARDS."
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="BattleRow" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -62.0
+offset_right = -16.0
+offset_bottom = -16.0
+alignment = 1
+theme_override_constants/separation = 12
+
+[node name="TutorialButton" type="Button" parent="BattleRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(100, 46)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "▸ TUTORIAL"
+
+[node name="Battle1v1Button" type="Button" parent="BattleRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(100, 46)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 14
+text = "▸ 1V1"
+
+[node name="Battle2v2Button" type="Button" parent="BattleRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(100, 46)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 14
+text = "▸ 2V2"

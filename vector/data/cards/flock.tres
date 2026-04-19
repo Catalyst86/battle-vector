@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"flock"
+display_name = "Flock"
+shape = 6
+role = 5
+color = Color(0.957, 0.447, 0.714, 1)
+description = "Spawns 5 small chevron scouts."
+unlock_level = 6
+cost = 5
+hp = 14.0
+damage = 5.0
+speed = 60.0
+attack_range = 70.0
+fire_rate = 0.5
+size = 12.0
+swarm_count = 5

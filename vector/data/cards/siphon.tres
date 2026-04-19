@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"siphon"
+display_name = "Siphon"
+shape = 4
+role = 3
+color = Color(0.078, 0.722, 0.651, 1)
+description = "Interceptor. Heals self for 50% of damage dealt."
+unlock_level = 10
+cost = 5
+hp = 35.0
+damage = 15.0
+speed = 50.0
+attack_range = 40.0
+fire_rate = 0.0
+size = 16.0
+lifesteal_frac = 0.5

@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"mender"
+display_name = "Mender"
+shape = 3
+role = 6
+color = Color(0.290, 0.871, 0.502, 1)
+description = "Seeks wounded allies. Heals 8 HP/sec in range."
+unlock_level = 4
+cost = 4
+hp = 40.0
+damage = 0.0
+speed = 30.0
+attack_range = 55.0
+fire_rate = 0.0
+size = 14.0
+aura_heal_per_sec = 8.0

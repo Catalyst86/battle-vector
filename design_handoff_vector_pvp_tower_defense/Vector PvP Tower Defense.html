@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VECTOR // PvP Tower Defense</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    background: radial-gradient(ellipse at center, #0f1420 0%, #05070d 60%, #000 100%);
+    min-height: 100vh;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    color: #e5e7eb;
+    overflow-x: hidden;
+  }
+  #stage {
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+  }
+  .tweaks-panel {
+    position: fixed; bottom: 20px; right: 20px;
+    background: rgba(12,14,18,0.92);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px;
+    padding: 16px;
+    width: 240px; z-index: 1000;
+    backdrop-filter: blur(12px);
+    font-size: 11px; letter-spacing: 1px;
+    display: none;
+  }
+  .tweaks-panel.on { display: block; }
+  .tweaks-panel h3 {
+    margin: 0 0 12px 0; font-size: 10px; letter-spacing: 3px;
+    opacity: 0.5; font-weight: 600;
+  }
+  .tweaks-panel label {
+    display: block; font-size: 9px; letter-spacing: 2px;
+    opacity: 0.6; margin: 10px 0 4px;
+  }
+  .tweaks-panel input[type="range"] { width: 100%; accent-color: #67e8f9; }
+  .tweaks-panel .seg {
+    display: flex; gap: 4px;
+  }
+  .tweaks-panel .seg button {
+    flex: 1; background: transparent;
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #e5e7eb; font-family: inherit; font-size: 9px;
+    padding: 6px 4px; border-radius: 6px; cursor: pointer;
+    letter-spacing: 1.5px;
+  }
+  .tweaks-panel .seg button.sel {
+    border-color: #67e8f9; background: rgba(103,232,249,0.1);
+    color: #67e8f9;
+  }
+  .tweaks-panel input[type="color"] {
+    width: 100%; height: 28px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: transparent;
+  }
+  .title {
+    position: fixed; top: 20px; left: 20px;
+    font-size: 10px; letter-spacing: 4px;
+    color: #67e8f9; opacity: 0.6;
+  }
+  .title b { color: #e5e7eb; opacity: 1; }
+</style>
+</head>
+<body>
+  <div class="title"><b>VECTOR</b> &nbsp;// &nbsp;PvP TOWER DEFENSE &nbsp;/ &nbsp;PROTO v1</div>
+
+  <div id="stage"></div>
+
+  <div class="tweaks-panel" id="tweaksPanel">
+    <h3>▸ TWEAKS</h3>
+    <label>AESTHETIC</label>
+    <div class="seg" id="aestheticSeg">
+      <button data-v="clean" class="sel">CLEAN</button>
+      <button data-v="neon">NEON</button>
+      <button data-v="mono">MONO</button>
+    </div>
+    <label>PARTICLE DENSITY</label>
+    <input type="range" id="particleSlider" min="0" max="200" value="60">
+    <label>GLOW INTENSITY</label>
+    <input type="range" id="glowSlider" min="0" max="8" step="0.5" value="3">
+    <label>ACCENT</label>
+    <input type="color" id="accentColor" value="#67e8f9">
+  </div>
+
+  <!-- Pinned React scripts -->
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="ios-frame.jsx"></script>
+  <script type="text/babel" src="game-data.jsx"></script>
+  <script type="text/babel" src="match-screen.jsx"></script>
+
+  <script type="text/babel">
+  const { useState, useEffect } = React;
+
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "aesthetic": "mono",
+    "particleDensity": 110,
+    "glow": 3,
+    "accent": "#67e8f9"
+  }/*EDITMODE-END*/;
+
+  function App() {
+    const [tweaks, setTweaks] = useState(TWEAK_DEFAULTS);
+    const [editMode, setEditMode] = useState(false);
+
+    useEffect(() => {
+      const onMsg = (e) => {
+        if (!e.data || typeof e.data !== 'object') return;
+        if (e.data.type === '__activate_edit_mode') setEditMode(true);
+        if (e.data.type === '__deactivate_edit_mode') setEditMode(false);
+      };
+      window.addEventListener('message', onMsg);
+      window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+      return () => window.removeEventListener('message', onMsg);
+    }, []);
+
+    useEffect(() => {
+      const panel = document.getElementById('tweaksPanel');
+      panel.classList.toggle('on', editMode);
+    }, [editMode]);
+
+    // hook up native HTML tweak controls
+    useEffect(() => {
+      const setT = (partial) => {
+        setTweaks(t => {
+          const next = { ...t, ...partial };
+          window.parent.postMessage({ type: '__edit_mode_set_keys', edits: partial }, '*');
+          return next;
+        });
+      };
+      const aestheticSeg = document.getElementById('aestheticSeg');
+      const onSeg = (e) => {
+        if (e.target.tagName !== 'BUTTON') return;
+        const v = e.target.getAttribute('data-v');
+        aestheticSeg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b === e.target));
+        setT({ aesthetic: v });
+      };
+      aestheticSeg.addEventListener('click', onSeg);
+
+      const pSlider = document.getElementById('particleSlider');
+      const gSlider = document.getElementById('glowSlider');
+      const accent = document.getElementById('accentColor');
+      pSlider.value = tweaks.particleDensity;
+      gSlider.value = tweaks.glow;
+      accent.value = tweaks.accent;
+      aestheticSeg.querySelectorAll('button').forEach(b => {
+        b.classList.toggle('sel', b.getAttribute('data-v') === tweaks.aesthetic);
+      });
+      const onP = () => setT({ particleDensity: +pSlider.value });
+      const onG = () => setT({ glow: +gSlider.value });
+      const onA = () => setT({ accent: accent.value });
+      pSlider.addEventListener('input', onP);
+      gSlider.addEventListener('input', onG);
+      accent.addEventListener('input', onA);
+
+      return () => {
+        aestheticSeg.removeEventListener('click', onSeg);
+        pSlider.removeEventListener('input', onP);
+        gSlider.removeEventListener('input', onG);
+        accent.removeEventListener('input', onA);
+      };
+    }, []);
+
+    return (
+      <div data-screen-label="01 Match" style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <IOSDevice width={390} height={844} dark={true}>
+          <div style={{ width: '100%', height: '100%' }}>
+            <MatchScreen tweaks={tweaks} />
+          </div>
+        </IOSDevice>
+      </div>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('stage')).render(<App />);
+  </script>
+</body>
+</html>

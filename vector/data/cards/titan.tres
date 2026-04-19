@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"titan"
+display_name = "Titan"
+shape = 1
+role = 1
+color = Color(0.957, 0.247, 0.369, 1)
+description = "Massive brawler. Phases through walls."
+unlock_level = 11
+cost = 8
+hp = 160.0
+damage = 45.0
+speed = 20.0
+attack_range = 20.0
+fire_rate = 0.0
+size = 26.0
+phases_walls = true

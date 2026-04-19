@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"bomb"
+display_name = "Bomb"
+shape = 1
+role = 1
+color = Color(0.984, 0.443, 0.522, 1)
+description = "Walks up and detonates. AoE."
+cost = 4
+hp = 50.0
+damage = 40.0
+speed = 35.0
+attack_range = 18.0
+fire_rate = 0.0
+size = 20.0
+swarm_count = 0

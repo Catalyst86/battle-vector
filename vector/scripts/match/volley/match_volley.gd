@@ -8,6 +8,8 @@ enum Phase { MATCH, OVERTIME, OVER }
 
 const SQUARE_SCENE: PackedScene = preload("res://scenes/match/volley/square.tscn")
 const GUN_SCENE: PackedScene = preload("res://scenes/match/volley/gun.tscn")
+const UNIT_SCENE: PackedScene = preload("res://scenes/match/unit.tscn")
+const SCOUT_CARD: CardData = preload("res://data/cards/_scout.tres")
 
 @onready var field: Node2D = $Field
 @onready var spawner: SquareSpawner = $Field/SquareSpawner
@@ -21,12 +23,23 @@ const GUN_SCENE: PackedScene = preload("res://scenes/match/volley/gun.tscn")
 @onready var hint_label: Label = %HintLabel
 @onready var game_over: GameOverOverlay = %GameOver
 @onready var midline: ColorRect = %Midline
+@onready var hand: CardHand = %Hand
+@onready var mana_bar: ManaBar = %ManaBar
+@onready var mana_label: Label = %ManaLabel
+@onready var enemy_mana_label: Label = %EnemyManaLabel
 
 const MATCH_SECONDS: float = 120.0
 const OVERTIME_SECONDS: float = 60.0
 const OT_MARGIN: int = 10  # overtime ends when a side leads by this many
 const FIELD_TOP: float = 80.0
-const FIELD_BOTTOM: float = 700.0
+const FIELD_BOTTOM: float = 680.0
+const MIDLINE_Y: float = 380.0
+## Mana economy — matches classic 1V1 defaults. Tuned later if needed.
+const MANA_MAX: int = 10
+const MANA_START: float = 6.0
+const MANA_REGEN_PER_SEC: float = 1.0
+## Delay before the same card can be deployed again, keeps one-card spam at bay.
+const DEPLOY_COOLDOWN: float = 0.4
 
 var phase: Phase = Phase.MATCH
 var _time_left: float = MATCH_SECONDS
@@ -34,10 +47,15 @@ var _player_score: int = 0
 var _enemy_score: int = 0
 var _player_gun: Gun
 var _enemy_gun: Gun
+var _deck: Array[CardData] = []
+var _selected: CardData = null
+var _mana: float = MANA_START
 
 func _ready() -> void:
 	add_to_group("match")
 	get_tree().paused = false
+	if UnitRegistry != null:
+		UnitRegistry.clear()
 	MusicPlayer.play(&"match", 0.8)
 	back_btn.pressed.connect(func():
 		SfxBank.play_ui(&"ui_back")
@@ -47,6 +65,7 @@ func _ready() -> void:
 		get_tree().paused = false
 		Router.goto("res://scenes/match/volley/match_volley.tscn"))
 	_spawn_guns()
+	_setup_hand()
 	_apply_hud_style()
 	_refresh_hud()
 	SfxBank.play(&"match_start")
@@ -81,10 +100,22 @@ func _spawn_guns() -> void:
 	_player_gun = _player_guns[0]
 	_enemy_gun = _enemy_guns[0]
 	spawner.square_spawned.connect(_on_square_spawned)
-	spawner.spawn_y = 390.0
+	spawner.spawn_y = MIDLINE_Y
 	# More targets for 2V2 — boost spawn rate.
 	if _team_size >= 2:
 		spawner.spawn_interval = 0.22
+
+func _setup_hand() -> void:
+	# Use the player's real deck. Tutorial mode doesn't apply in Volley (MVP).
+	if PlayerDeck != null and not PlayerDeck.cards.is_empty():
+		_deck = PlayerDeck.cards
+	else:
+		_deck = []
+	hand.deck = _deck
+	hand.build()
+	hand.set_interactive(true)
+	hand.card_selected.connect(_on_card_selected)
+	hand.set_affordability(int(_mana))
 
 func _gun_positions(count: int, y: float) -> Array:
 	# Single gun sits centre; duo splits left/right of centre.
@@ -107,6 +138,14 @@ func _apply_hud_style() -> void:
 	enemy_hp_label.add_theme_color_override("font_color", Palette.UI_TEXT_2)
 	hint_label.add_theme_font_override("font", Palette.FONT_MONO)
 	hint_label.add_theme_color_override("font_color", Palette.UI_TEXT_3)
+	mana_label.add_theme_font_override("font", Palette.FONT_MONO_BOLD)
+	mana_label.add_theme_color_override("font_color", Palette.UI_CYAN)
+	enemy_mana_label.add_theme_font_override("font", Palette.FONT_MONO_BOLD)
+	enemy_mana_label.add_theme_color_override("font_color", Palette.UI_RED)
+	if mana_bar is ManaBar:
+		(mana_bar as ManaBar).pip_color = Palette.UI_CYAN
+		(mana_bar as ManaBar).dim_color = Palette.UI_LINE_2
+		mana_bar.queue_redraw()
 	var exit_sb := StyleBoxFlat.new()
 	exit_sb.bg_color = Palette.UI_BG_1
 	exit_sb.border_color = Palette.UI_LINE_2
@@ -133,6 +172,8 @@ func _on_square_destroyed(killer_is_enemy: bool, score: int) -> void:
 func _process(delta: float) -> void:
 	if phase == Phase.OVER:
 		return
+	# Mana regen — matches classic rate so deck-builders transfer feel.
+	_mana = minf(_mana + MANA_REGEN_PER_SEC * delta, float(MANA_MAX))
 	_time_left -= delta
 	# Escape check — a square that exits the opposing team's side without
 	# being killed credits THIS team. ("Your defenders slipped one past
@@ -150,6 +191,77 @@ func _process(delta: float) -> void:
 	_refresh_hud()
 	if _time_left <= 0.0:
 		_advance_phase()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if phase == Phase.OVER:
+		return
+	if not (event is InputEventMouseButton):
+		return
+	var m := event as InputEventMouseButton
+	if not (m.pressed and m.button_index == MOUSE_BUTTON_LEFT):
+		return
+	if _selected != null:
+		_try_deploy(m.position)
+
+func _on_card_selected(card: CardData) -> void:
+	_selected = card
+	_update_hint()
+
+## Pay mana + spawn a unit on the player's half. Rejects clicks on the
+## enemy's half (past midline) and silently no-ops if the player can't
+## afford the selected card — classic mode behaves the same.
+func _try_deploy(screen: Vector2) -> void:
+	if _selected == null:
+		return
+	if _selected.cost > int(_mana):
+		return
+	# Deploy bounds: player half only (below midline). Small margin at top/
+	# bottom so units don't spawn inside the gun or off-screen.
+	if screen.y < MIDLINE_Y + 10.0:
+		return
+	if screen.y > FIELD_BOTTOM - 10.0:
+		return
+	if screen.x < 20.0 or screen.x > 340.0:
+		return
+	_mana -= float(_selected.cost)
+	var deployed := _selected
+	SfxBank.play_event(deployed, &"deploy")
+	PlayerProfile.buzz(25)
+	_spawn_unit(deployed, screen, false)
+	_refresh_hud()
+	hand.deselect()
+	hand.trigger_cooldown(deployed, DEPLOY_COOLDOWN)
+	_selected = null
+	_update_hint()
+
+func _spawn_unit(c: CardData, at_world: Vector2, enemy: bool) -> void:
+	if c == null:
+		return
+	if c.role == CardData.Role.SWARM:
+		var n: int = maxi(1, c.swarm_count)
+		for i in range(n):
+			var offset := Vector2(randf_range(-18.0, 18.0), randf_range(-8.0, 8.0))
+			_spawn_single(SCOUT_CARD, at_world + offset, enemy)
+		return
+	_spawn_single(c, at_world, enemy)
+
+func _spawn_single(c: CardData, at_world: Vector2, enemy: bool) -> void:
+	var u := UNIT_SCENE.instantiate()
+	u.card = c
+	u.is_enemy = enemy
+	field.add_child(u)
+	u.spawn_at(at_world)
+
+func _update_hint() -> void:
+	if phase == Phase.OVER:
+		hint_label.text = ""
+		return
+	if _selected == null:
+		hint_label.text = "▸ TAP A CARD"
+	elif _selected.cost > int(_mana):
+		hint_label.text = "NEED %d MANA — TAP CARD TO CANCEL" % _selected.cost
+	else:
+		hint_label.text = "▼ TAP YOUR SIDE TO DEPLOY ▼"
 
 func _award_from_escape(sq: Square) -> int:
 	# Grab the square's intended score directly from its tier stats table.
@@ -220,13 +332,25 @@ func _refresh_hud() -> void:
 		if is_instance_valid(g): e_hp += int(g.hp)
 	player_hp_label.text = "HP %d" % p_hp
 	enemy_hp_label.text = "HP %d" % e_hp
+	# Mana — player's live value + the bot's tracked mana (driven by bot
+	# deploy loop once it lands; for Item 1 this mirrors the player's rate
+	# as a placeholder so the HUD doesn't read 0/10 the whole match).
+	mana_bar.set_value(_mana, MANA_MAX)
+	mana_label.text = "⚡ %d/%d" % [int(_mana), MANA_MAX]
+	enemy_mana_label.text = "⚡ %d/%d" % [int(_mana), MANA_MAX]
+	hand.set_affordability(int(_mana))
 	if phase == Phase.OVERTIME:
 		hint_label.text = "▸ OVERTIME — LEAD BY %d TO WIN" % OT_MARGIN
-	elif _time_left <= 10.0:
+	elif _time_left <= 10.0 and _selected == null:
 		hint_label.text = "▸ FINAL SECONDS"
-	elif _player_score > _enemy_score + 20:
-		hint_label.text = "▸ HOLD THE LINE"
-	elif _player_score < _enemy_score - 20:
-		hint_label.text = "▸ PRESS HARDER — YOU'RE BEHIND"
+	elif _selected == null:
+		if _player_score > _enemy_score + 20:
+			hint_label.text = "▸ HOLD THE LINE"
+		elif _player_score < _enemy_score - 20:
+			hint_label.text = "▸ PRESS HARDER — YOU'RE BEHIND"
+		else:
+			hint_label.text = "▸ TAP A CARD"
+	elif _selected != null and _selected.cost > int(_mana):
+		hint_label.text = "NEED %d MANA — TAP CARD TO CANCEL" % _selected.cost
 	else:
-		hint_label.text = "▸ VOLLEY — CLOSE MATCH"
+		hint_label.text = "▼ TAP YOUR SIDE TO DEPLOY ▼"

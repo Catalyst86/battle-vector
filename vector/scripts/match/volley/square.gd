@@ -54,8 +54,24 @@ func take_damage(amount: float, from_enemy: bool) -> void:
 	hp -= amount
 	_hit_flash = 1.0
 	if hp <= 0.0:
+		_spawn_death_fx()
 		destroyed.emit(from_enemy, _score)
 		queue_free()
+
+## Pop on kill — burst particle + tier-weighted SFX. Handoff calls this out
+## as the single highest-impact feel uplift in the project; worth doing
+## even for the MVP. Uses the pooled DeathBurst in flat mode so it renders
+## at the square's 2D field position without Pseudo3D offsetting it.
+func _spawn_death_fx() -> void:
+	var parent := get_parent()
+	if parent != null and SpawnPool != null:
+		var b: DeathBurst = SpawnPool.acquire_burst(parent) as DeathBurst
+		if b != null:
+			b.setup(position, _color, true)
+	var id: StringName = &"death_small"
+	if tier == Tier.ARMORED or tier == Tier.ELITE or tier == Tier.BOSS:
+		id = &"death_heavy"
+	SfxBank.play(id)
 
 func _process(delta: float) -> void:
 	_age += delta

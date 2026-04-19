@@ -16,7 +16,9 @@ var _dirs: PackedVector2Array = PackedVector2Array()
 var _speeds: PackedFloat32Array = PackedFloat32Array()
 var _released: bool = false
 
-func setup(at: Vector2, c: Color) -> void:
+## `flat=true` skips Pseudo3D projection — used by VOLLEY mode where the
+## field is 2D and the caller passes parent-local screen coords directly.
+func setup(at: Vector2, c: Color, flat: bool = false) -> void:
 	world_pos = at
 	color = c
 	_t = 0.0
@@ -27,9 +29,13 @@ func setup(at: Vector2, c: Color) -> void:
 		var angle: float = randf() * TAU
 		_dirs.append(Vector2(cos(angle), sin(angle)))
 		_speeds.append(randf_range(SPEED_MIN, SPEED_MAX))
-	position = Pseudo3D.project(world_pos)
-	var s := Pseudo3D.scale_at(world_pos.y)
-	scale = Vector2.ONE * s * GameConfig.data.unit_display_scale
+	if flat:
+		position = at
+		scale = Vector2.ONE
+	else:
+		position = Pseudo3D.project(world_pos)
+		var s := Pseudo3D.scale_at(world_pos.y)
+		scale = Vector2.ONE * s * GameConfig.data.unit_display_scale
 
 func reset() -> void:
 	world_pos = Vector2.ZERO

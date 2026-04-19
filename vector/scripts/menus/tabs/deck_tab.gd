@@ -1,6 +1,14 @@
 extends Control
 ## DECK tab — 4-col deck grid, detail panel for selected card, balance meter,
 ## active synergies, EDIT DECK primary CTA.
+##
+## Long-press a deck tile to pop a context menu (VIEW INFO / REMOVE).
+## VIEW INFO opens a full-screen card detail modal; REMOVE saves the deck
+## with that slot dropped and sends the player to the deck builder to
+## pick a replacement.
+
+const LONG_PRESS_SEC: float = 0.45
+const LONG_PRESS_MAX_DRIFT: float = 20.0
 
 var _selected_idx: int = 0
 var _detail_host: Control
@@ -8,8 +16,19 @@ var _balance_host: Control
 var _synergy_host: Control
 var _grid_host: Control
 
+var _press_idx: int = -1
+var _press_pos: Vector2
+var _press_timer: Timer
+var _long_press_fired: bool = false
+var _context_menu: Control = null
+
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	_press_timer = Timer.new()
+	_press_timer.one_shot = true
+	_press_timer.wait_time = LONG_PRESS_SEC
+	_press_timer.timeout.connect(_on_long_press_fired)
+	add_child(_press_timer)
 	var sc: ScrollContainer = TabHelpers.tab_scroll()
 	add_child(sc)
 	var outer: VBoxContainer = TabHelpers.tab_column()
@@ -85,16 +104,11 @@ func _build_deck_tile(c: CardData, idx: int) -> Control:
 		sb.shadow_color = Palette.UI_CYAN_GLOW
 		sb.shadow_size = 6
 	panel.add_theme_stylebox_override("panel", sb)
-	var btn := Button.new()
-	btn.flat = true
-	btn.focus_mode = Control.FOCUS_NONE
-	btn.set_anchors_preset(Control.PRESET_FULL_RECT)
-	panel.add_child(btn)
-	btn.pressed.connect(func():
-		SfxBank.play_ui(&"ui_click")
-		_selected_idx = idx
-		_rebuild_grid()
-		_rebuild_detail())
+	# Custom gui_input instead of a Button so we can detect long-press
+	# without Button's built-in click semantics consuming the event first.
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.gui_input.connect(func(e: InputEvent):
+		_handle_tile_input(e, idx, panel))
 
 	var vb := VBoxContainer.new()
 	vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -300,3 +314,335 @@ func _find_card(id: StringName) -> CardData:
 		if c.id == id:
 			return c
 	return null
+
+# ─── Long-press + context menu ─────────────────────────────────────────────
+
+func _handle_tile_input(event: InputEvent, idx: int, tile: Control) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.button_index != MOUSE_BUTTON_LEFT:
+			return
+		if mb.pressed:
+			_press_idx = idx
+			_press_pos = mb.position
+			_long_press_fired = false
+			_press_timer.start()
+		else:
+			_press_timer.stop()
+			if _long_press_fired:
+				_long_press_fired = false
+				return  # context menu already showed; don't also select
+			if _press_idx == idx:
+				# Tap — select card.
+				SfxBank.play_ui(&"ui_click")
+				_selected_idx = idx
+				_rebuild_grid()
+				_rebuild_detail()
+			_press_idx = -1
+	elif event is InputEventMouseMotion:
+		# Cancel long-press if the finger drifts past the threshold — that's
+		# the user trying to scroll, not holding to pop the menu.
+		if _press_idx == idx:
+			var mm := event as InputEventMouseMotion
+			if mm.position.distance_to(_press_pos) > LONG_PRESS_MAX_DRIFT:
+				_press_timer.stop()
+				_press_idx = -1
+
+func _on_long_press_fired() -> void:
+	if _press_idx < 0:
+		return
+	_long_press_fired = true
+	SfxBank.play_ui(&"ui_confirm")
+	_show_context_menu(_press_idx)
+
+func _show_context_menu(idx: int) -> void:
+	if _context_menu != null and is_instance_valid(_context_menu):
+		_context_menu.queue_free()
+	var cards: Array = PlayerDeck.cards if PlayerDeck != null else []
+	if idx < 0 or idx >= cards.size():
+		return
+	var card: CardData = cards[idx]
+	# Full-tab overlay with dim backdrop + centred menu.
+	var overlay := Control.new()
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.z_index = 30
+	var backdrop := ColorRect.new()
+	backdrop.color = Color(0.016, 0.027, 0.047, 0.78)
+	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	backdrop.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			_close_context_menu())
+	overlay.add_child(backdrop)
+
+	var panel := PanelContainer.new()
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.custom_minimum_size = Vector2(240, 0)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Palette.UI_BG_1
+	sb.border_color = Palette.UI_CYAN
+	sb.border_width_top = 1; sb.border_width_bottom = 1
+	sb.border_width_left = 1; sb.border_width_right = 1
+	sb.shadow_color = Palette.UI_CYAN_GLOW
+	sb.shadow_size = 10
+	panel.add_theme_stylebox_override("panel", sb)
+	overlay.add_child(panel)
+
+	var m: MarginContainer = TabHelpers.margin(14, 12, 14, 12)
+	panel.add_child(m)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 8)
+	m.add_child(col)
+
+	# Header with glyph + name
+	var hdr := HBoxContainer.new()
+	hdr.add_theme_constant_override("separation", 8)
+	col.add_child(hdr)
+	var icon := ShapeIcon.new()
+	icon.shape = card.shape
+	icon.color = card.color
+	icon.icon_size = 14.0
+	icon.custom_minimum_size = Vector2(28, 28)
+	hdr.add_child(icon)
+	var name_lbl: Label = TabHelpers.label(card.display_name.to_upper(), 13, card.color)
+	name_lbl.add_theme_font_override("font", Palette.FONT_DISPLAY_BOLD)
+	name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hdr.add_child(name_lbl)
+	hdr.add_child(TabHelpers.mono(card.role_label(), 9, Palette.UI_TEXT_3))
+	col.add_child(TabHelpers.divider(Palette.UI_LINE_2))
+
+	var info_btn: Button = TabHelpers.ghost_button("▸ VIEW INFO", func():
+		_close_context_menu()
+		_show_card_detail(card), Palette.UI_CYAN)
+	info_btn.custom_minimum_size = Vector2(0, 44)
+	col.add_child(info_btn)
+	var remove_btn: Button = TabHelpers.ghost_button("× REMOVE FROM DECK", func():
+		_close_context_menu()
+		_remove_from_deck(idx), Palette.UI_RED)
+	remove_btn.add_theme_color_override("font_color", Palette.UI_RED)
+	remove_btn.custom_minimum_size = Vector2(0, 44)
+	col.add_child(remove_btn)
+
+	add_child(overlay)
+	_context_menu = overlay
+	# Pop-in anim
+	panel.modulate = Color(1, 1, 1, 0)
+	panel.scale = Vector2(0.9, 0.9)
+	panel.pivot_offset = panel.size * 0.5
+	var tw := create_tween().set_parallel(true)
+	tw.tween_property(panel, "modulate:a", 1.0, 0.14)
+	tw.tween_property(panel, "scale", Vector2.ONE, 0.18).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+
+func _close_context_menu() -> void:
+	if _context_menu == null or not is_instance_valid(_context_menu):
+		return
+	SfxBank.play_ui(&"ui_back")
+	var menu := _context_menu
+	_context_menu = null
+	var tw := create_tween()
+	tw.tween_property(menu, "modulate:a", 0.0, 0.12)
+	tw.finished.connect(func(): menu.queue_free())
+
+func _remove_from_deck(idx: int) -> void:
+	if PlayerDeck == null:
+		return
+	var cards: Array[CardData] = PlayerDeck.cards.duplicate()
+	if idx < 0 or idx >= cards.size():
+		return
+	var removed: CardData = cards[idx]
+	cards.remove_at(idx)
+	PlayerDeck.save_deck(cards)
+	Toast.notify("▸ %s REMOVED — PICK A REPLACEMENT" % removed.display_name.to_upper(), 2.0)
+	Router.goto("res://scenes/menus/deck_builder.tscn")
+
+# ─── Card detail modal ─────────────────────────────────────────────────────
+
+func _show_card_detail(card: CardData) -> void:
+	var overlay := Control.new()
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.z_index = 35
+	var backdrop := ColorRect.new()
+	backdrop.color = Color(0.016, 0.027, 0.047, 0.92)
+	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	backdrop.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			_close_detail(overlay))
+	overlay.add_child(backdrop)
+
+	var sheet := PanelContainer.new()
+	sheet.set_anchors_preset(Control.PRESET_FULL_RECT)
+	sheet.offset_left = 16; sheet.offset_right = -16
+	sheet.offset_top = 60; sheet.offset_bottom = -60
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Palette.UI_BG_1
+	sb.border_color = Palette.UI_CYAN
+	sb.border_width_top = 1; sb.border_width_bottom = 1
+	sb.border_width_left = 1; sb.border_width_right = 1
+	sheet.add_theme_stylebox_override("panel", sb)
+	overlay.add_child(sheet)
+	# Corner brackets — added as direct children and anchored full-rect;
+	# works here because the sheet is a PanelContainer with just this one
+	# content child, the Corners acts as the second child covering the rect.
+	var corners := Corners.new()
+	corners.color = Palette.UI_CYAN
+	corners.top_left = true
+	corners.top_right = true
+	corners.bottom_left = true
+	corners.bottom_right = true
+	sheet.add_child(corners)
+
+	var m: MarginContainer = TabHelpers.margin(18, 18, 18, 18)
+	sheet.add_child(m)
+	var sc := ScrollContainer.new()
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	m.add_child(sc)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 14)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sc.add_child(col)
+
+	col.add_child(_detail_header(card))
+	col.add_child(_detail_glyph(card))
+	col.add_child(_detail_description(card))
+	col.add_child(_detail_stats(card))
+	col.add_child(_detail_synergies(card))
+
+	var close_btn: Button = TabHelpers.primary_button("▸ CLOSE", func(): _close_detail(overlay))
+	col.add_child(close_btn)
+
+	add_child(overlay)
+	# Fade-in
+	overlay.modulate = Color(1, 1, 1, 0)
+	var tw := create_tween()
+	tw.tween_property(overlay, "modulate:a", 1.0, 0.18)
+
+func _close_detail(overlay: Control) -> void:
+	SfxBank.play_ui(&"ui_back")
+	var tw := create_tween()
+	tw.tween_property(overlay, "modulate:a", 0.0, 0.14)
+	tw.finished.connect(func(): overlay.queue_free())
+
+func _detail_header(card: CardData) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 2)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_child(TabHelpers.label("▸ UNIT FILE", 9, Palette.UI_TEXT_3))
+	var name_lbl: Label = TabHelpers.label(card.display_name.to_upper(), 22, card.color)
+	name_lbl.add_theme_font_override("font", Palette.FONT_DISPLAY_BOLD)
+	col.add_child(name_lbl)
+	col.add_child(TabHelpers.mono("%s  //  %s" % [card.role_label(), String(card.rarity).to_upper()], 10, Palette.UI_TEXT_2))
+	row.add_child(col)
+	# Cost pip
+	var pip := PanelContainer.new()
+	pip.custom_minimum_size = Vector2(48, 48)
+	var psb := StyleBoxFlat.new()
+	psb.bg_color = Palette.UI_AMBER
+	psb.border_color = Palette.UI_AMBER
+	pip.add_theme_stylebox_override("panel", psb)
+	var cost_lbl := Label.new()
+	cost_lbl.text = str(card.cost)
+	cost_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cost_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	cost_lbl.add_theme_font_override("font", Palette.FONT_MONO_BOLD)
+	cost_lbl.add_theme_font_size_override("font_size", 22)
+	cost_lbl.add_theme_color_override("font_color", Color.BLACK)
+	pip.add_child(cost_lbl)
+	row.add_child(pip)
+	return row
+
+func _detail_glyph(card: CardData) -> Control:
+	var panel := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.047, 0.055, 0.071, 0.7)
+	sb.border_color = Palette.UI_LINE_2
+	sb.border_width_top = 1; sb.border_width_bottom = 1
+	sb.border_width_left = 1; sb.border_width_right = 1
+	panel.add_theme_stylebox_override("panel", sb)
+	panel.custom_minimum_size = Vector2(0, 140)
+	var icon := ShapeIcon.new()
+	icon.shape = card.shape
+	icon.color = card.color
+	icon.icon_size = 42.0
+	icon.glow = true
+	panel.add_child(icon)
+	return panel
+
+func _detail_description(card: CardData) -> Control:
+	var desc_text: String = card.description if card.description != "" else _default_role_desc(card.role)
+	var lbl: Label = TabHelpers.mono(desc_text, 11, Palette.UI_TEXT_1)
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lbl.custom_minimum_size = Vector2(0, 0)
+	return lbl
+
+func _default_role_desc(role: int) -> String:
+	match role:
+		CardData.Role.SHOOTER: return "Fires ranged projectiles at the nearest enemy unit."
+		CardData.Role.MELEE: return "Walks toward the enemy and detonates on contact for AoE damage."
+		CardData.Role.WALLBREAK: return "Drills through walls without stopping. Good for cracking defences."
+		CardData.Role.INTERCEPTOR: return "Chases down and rams into enemy units at close range."
+		CardData.Role.SNIPER: return "Stationary, long-range. Picks off distant targets."
+		CardData.Role.SWARM: return "Deploys multiple small scouts instead of a single unit."
+		CardData.Role.HEALER: return "Restores HP to nearby allies."
+		CardData.Role.BUFFER: return "Emits an aura that boosts allies in range."
+	return "Deployed combat unit."
+
+func _detail_stats(card: CardData) -> Control:
+	var panel: PanelContainer = TabHelpers.make_panel(Palette.UI_BG_1, Palette.UI_LINE_2)
+	var m: MarginContainer = TabHelpers.margin(12, 10, 12, 10)
+	panel.add_child(m)
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 8)
+	m.add_child(grid)
+	grid.add_child(_stat_cell("DMG", "%d" % int(card.damage), Palette.UI_RED))
+	grid.add_child(_stat_cell("HP", "%d" % int(card.hp), Palette.UI_GREEN))
+	grid.add_child(_stat_cell("COST", str(card.cost), Palette.UI_AMBER))
+	grid.add_child(_stat_cell("RNG", "%d" % int(card.attack_range / 20.0), Palette.UI_CYAN))
+	var rate_txt: String = "—" if card.fire_rate <= 0.0 else "%.1f/s" % (1.0 / card.fire_rate)
+	grid.add_child(_stat_cell("RATE", rate_txt, Palette.UI_TEXT_0))
+	grid.add_child(_stat_cell("SPEED", "%d" % int(card.speed), Palette.UI_TEXT_0))
+	return panel
+
+func _stat_cell(label_text: String, value: String, color: Color) -> Control:
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 0)
+	vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vb.add_child(TabHelpers.label(label_text, 8, Palette.UI_TEXT_3))
+	var v: Label = TabHelpers.mono(value, 14, color)
+	v.add_theme_font_override("font", Palette.FONT_MONO_BOLD)
+	vb.add_child(v)
+	return vb
+
+func _detail_synergies(card: CardData) -> Control:
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 6)
+	vb.add_child(TabHelpers.label("▸ SYNERGIES", 10, Palette.UI_TEXT_3))
+	var rows_added: int = 0
+	if Synergies != null:
+		for pair in Synergies.PAIRS:
+			if pair.a != card.id and pair.b != card.id:
+				continue
+			var partner_id: StringName = pair.b if pair.a == card.id else pair.a
+			var partner: CardData = _find_card(partner_id)
+			if partner == null:
+				continue
+			var row := HBoxContainer.new()
+			row.add_theme_constant_override("separation", 6)
+			var partner_icon := ShapeIcon.new()
+			partner_icon.shape = partner.shape
+			partner_icon.color = partner.color
+			partner_icon.icon_size = 9.0
+			partner_icon.custom_minimum_size = Vector2(20, 20)
+			row.add_child(partner_icon)
+			row.add_child(TabHelpers.mono("+ %s  —  %s +%d%%" % [
+				partner.display_name.to_upper(), String(pair.label),
+				int(round(float(pair.bonus) * 100.0))], 10, Palette.UI_TEXT_1))
+			vb.add_child(row)
+			rows_added += 1
+	if rows_added == 0:
+		vb.add_child(TabHelpers.mono("NO KNOWN SYNERGIES.", 10, Palette.UI_TEXT_3))
+	return vb

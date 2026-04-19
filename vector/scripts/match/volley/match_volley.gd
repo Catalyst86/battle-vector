@@ -251,6 +251,25 @@ func _spawn_single(c: CardData, at_world: Vector2, enemy: bool) -> void:
 	u.is_enemy = enemy
 	field.add_child(u)
 	u.spawn_at(at_world)
+	# VOLLEY-specific wiring: units walk toward the closest enemy gun,
+	# ignoring walls and BaseGrid arrival. Picked closest so 2V2 deploys
+	# near one gun prefer it over the diagonally-opposite one.
+	u._volley_gun_target = _pick_target_gun(at_world, enemy)
+
+## Closest living gun on the opposite side. Returns null only if every
+## gun on that side has already been destroyed — rare, guarded downstream.
+func _pick_target_gun(from: Vector2, attacker_is_enemy: bool) -> Gun:
+	var pool: Array[Gun] = _player_guns if attacker_is_enemy else _enemy_guns
+	var best: Gun = null
+	var best_d: float = INF
+	for g in pool:
+		if g == null or not is_instance_valid(g):
+			continue
+		var d: float = from.distance_to(g.position)
+		if d < best_d:
+			best_d = d
+			best = g
+	return best
 
 func _update_hint() -> void:
 	if phase == Phase.OVER:

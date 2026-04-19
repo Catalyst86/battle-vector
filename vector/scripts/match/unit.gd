@@ -28,6 +28,12 @@ var _prev_world: Vector2 = Vector2.ZERO
 ## Hit-flash brightness (0..1). Bumped in take_damage, decays each _process,
 ## blended into modulate by _update_render. Separate from spawn-fade alpha.
 var _flash: float = 0.0
+## VOLLEY mode: when set, this unit walks toward the target gun instead of a
+## BaseGrid strip, ignores walls (Volley has none), and renders flat (no
+## Pseudo3D projection — the Volley field is 2D). On contact it deals its
+## effective damage to the gun and self-destructs. Set by match_volley.gd
+## immediately after spawn.
+var _volley_gun_target: Node2D = null
 
 func _ready() -> void:
 	assert(card != null, "Unit.card not assigned")
@@ -134,8 +140,11 @@ func _process(delta: float) -> void:
 		CardData.Role.BUFFER: _do_buffer(delta)
 		# SWARM never arrives here — replaced on spawn.
 
-	_resolve_wall_collision(delta)
-	_check_base_arrival()
+	if _volley_gun_target != null:
+		_check_volley_gun_arrival()
+	else:
+		_resolve_wall_collision(delta)
+		_check_base_arrival()
 	_update_render()
 	queue_redraw()
 
@@ -312,6 +321,10 @@ func _spawn_projectiles(target: Vector2) -> void:
 ## Picks a specific alive square from the opposing base for ranged aim.
 ## Returns Vector2.INF if no alive squares remain.
 func _pick_base_square_target() -> Vector2:
+	# Volley mode has no BaseGrid — SHOOTERs / SNIPERs aim at the enemy gun
+	# directly so they contribute DPS to the siege effort even while walking.
+	if _volley_gun_target != null and is_instance_valid(_volley_gun_target):
+		return _volley_gun_target.position
 	var group_name: String = "enemy_base" if not is_enemy else "player_base"
 	var base := get_tree().get_first_node_in_group(group_name) as BaseGrid
 	if base == null:
@@ -423,18 +436,43 @@ func _check_base_arrival() -> void:
 		reached_base.emit(reached, world_pos, effective_damage)
 		queue_free()
 
+## VOLLEY arrival — on contact with the target gun, deal the unit's current
+## effective damage and self-destruct. Uses a generous hit radius so fast
+## units that overshoot in one frame still register. Dying here spawns a
+## death burst exactly like _die() does for unit-vs-unit kills.
+func _check_volley_gun_arrival() -> void:
+	if _arrived or _volley_gun_target == null or not is_instance_valid(_volley_gun_target):
+		return
+	var gun_pos: Vector2 = _volley_gun_target.position
+	var d: float = world_pos.distance_to(gun_pos)
+	if d <= 24.0:
+		_arrived = true
+		if _volley_gun_target.has_method("take_damage"):
+			_volley_gun_target.take_damage(effective_damage)
+		get_tree().call_group("match", "shake", 3.0)
+		_spawn_death_burst()
+		SfxBank.play_event(card, &"death")
+		queue_free()
+
 # --- Rendering ---------------------------------------------------------------
 
 func _update_render() -> void:
 	var cfg := GameConfig.data
 	var pop_t: float = clampf(_spawn_t / cfg.deploy_pop_duration, 0.0, 1.0)
 	var pop_ease: float = 1.0 - pow(1.0 - pop_t, 3.0)
-	var screen: Vector2 = Pseudo3D.project(world_pos)
-	screen.y += (1.0 - pop_ease) * -cfg.deploy_pop_distance
-	position = screen
-	var s: float = Pseudo3D.scale_at(world_pos.y)
 	var pop_scale: float = lerpf(1.35, 1.0, pop_ease)
-	scale = Vector2.ONE * s * pop_scale * cfg.unit_display_scale
+	if _volley_gun_target != null:
+		# VOLLEY: flat 2D field — no perspective pinch or depth scaling.
+		var screen := world_pos
+		screen.y += (1.0 - pop_ease) * -cfg.deploy_pop_distance
+		position = screen
+		scale = Vector2.ONE * pop_scale * cfg.unit_display_scale
+	else:
+		var screen: Vector2 = Pseudo3D.project(world_pos)
+		screen.y += (1.0 - pop_ease) * -cfg.deploy_pop_distance
+		position = screen
+		var s: float = Pseudo3D.scale_at(world_pos.y)
+		scale = Vector2.ONE * s * pop_scale * cfg.unit_display_scale
 	# Hit-flash adds white brightness that decays. Spawn fade uses alpha.
 	var base_alpha: float = lerpf(0.15, 1.0, pop_ease)
 	var f: float = _flash

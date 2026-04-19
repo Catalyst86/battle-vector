@@ -17,10 +17,21 @@ enum Role {
 }
 enum Shape { TRIANGLE, SQUARE, DIAMOND, CIRCLE, RING, STAR, CHEVRON, SPIRAL }
 
+## Card kind — controls what the card DOES when deployed, distinct from its
+## combat role. In classic 1V1/2V2 mode this is always SIEGE behaviour (the
+## card spawns a walking unit). In VOLLEY mode kinds branch: SIEGE still
+## walks toward the enemy gun, INTERCEPTOR parks at midline and hunts
+## squares, SPELL applies an instant gun effect with no unit spawn.
+enum Kind { SIEGE, INTERCEPTOR, SPELL }
+
 @export var id: StringName = &""
 @export var display_name: String = ""
 @export var shape: Shape = Shape.CIRCLE
 @export var role: Role = Role.SHOOTER
+@export var kind: Kind = Kind.SIEGE
+## For SPELL cards only — id of the spell effect to fire on cast.
+## One of: &"coolant" / &"overclock" / &"spread" / &"focus" / &"siphon" / &"surge".
+@export var spell_id: StringName = &""
 @export_color_no_alpha var color: Color = Color(1, 1, 1)
 @export_multiline var description: String = ""
 ## Player level required to own/play this card. Default 1 = always available.

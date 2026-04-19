@@ -36,6 +36,7 @@ Synergies="*res://autoload/synergies.gd"
 Leaderboard="*res://autoload/leaderboard.gd"
 Toast="*res://autoload/toast.gd"
 BotPersonas="*res://autoload/bot_personas.gd"
+GunModules="*res://autoload/gun_modules.gd"
 
 [display]
 

@@ -43,6 +43,14 @@ extends Resource
 @export var season_xp: int = 0
 @export var season_pass_claimed: Array[int] = []
 
+## Gun module progression for VOLLEY mode. Map of module_id (StringName) →
+## tier (int, starts at 1 when unlocked). Starter modules are seeded on
+## first load via GunModules.ensure_starters.
+@export var gun_modules: Dictionary = {}
+## Three-slot loadout of module ids. Seeded to the starter trio on first
+## load; player can edit in the Loadout modal before each Volley match.
+@export var gun_loadout: Array[StringName] = []
+
 ## Audio settings — linear 0..1 values that map onto the Music and SFX bus
 ## volumes. Applied by PlayerProfile on load and whenever the user adjusts a
 ## slider in the settings menu.

@@ -7,6 +7,7 @@ extends Control
 const SETTINGS_MODAL := preload("res://scenes/menus/settings_modal.tscn")
 const QUEUE_OVERLAY := preload("res://scenes/menus/queue_overlay.tscn")
 const MATCH_CONFIRM := preload("res://scenes/menus/match_confirm.tscn")
+const LOADOUT_MODAL := preload("res://scenes/menus/loadout_modal.tscn")
 
 ## Per-tab scene/script map. Each value is a script; we instantiate it as a
 ## Control and add it to the Content panel when its tab becomes active.
@@ -137,12 +138,18 @@ func _on_queue_requested(mode: StringName) -> void:
 	var confirm: Control = MATCH_CONFIRM.instantiate()
 	confirm.set("mode", mode)
 	confirm.connect("confirmed", func(confirmed_mode: StringName):
-		# Volley mode skips the radar queue for now — just route straight
-		# into the match. When networking lands the queue can gate every
-		# mode uniformly.
-		if confirmed_mode == &"volley":
-			CurrentMatch.set_mode(load("res://data/game_modes/solo_volley.tres") as GameMode)
-			Router.goto("res://scenes/match/volley/match_volley.tscn")
+		# Volley modes go through the Loadout modal first so the player can
+		# swap gun modules. Classic modes skip straight to the queue radar.
+		if confirmed_mode == &"volley" or confirmed_mode == &"volley_2v2":
+			var resource_path: String = ("res://data/game_modes/solo_volley_2v2.tres"
+				if confirmed_mode == &"volley_2v2"
+				else "res://data/game_modes/solo_volley.tres")
+			CurrentMatch.set_mode(load(resource_path) as GameMode)
+			var loadout: Control = LOADOUT_MODAL.instantiate()
+			loadout.set("target_scene", "res://scenes/match/volley/match_volley.tscn")
+			loadout.connect("confirmed", func(scene: String):
+				Router.goto(scene))
+			_spawn_modal(loadout)
 			return
 		var q: Control = QUEUE_OVERLAY.instantiate()
 		q.set("mode", confirmed_mode)

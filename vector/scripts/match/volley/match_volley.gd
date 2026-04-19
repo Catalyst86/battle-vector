@@ -52,22 +52,45 @@ func _ready() -> void:
 	SfxBank.play(&"match_start")
 	PlayerProfile.buzz(40)
 
+var _player_guns: Array[Gun] = []
+var _enemy_guns: Array[Gun] = []
+var _team_size: int = 1
+
 func _spawn_guns() -> void:
-	_player_gun = GUN_SCENE.instantiate() as Gun
-	_player_gun.is_enemy = false
-	_player_gun.color = Palette.UI_CYAN
-	field.add_child(_player_gun)
-	_player_gun.position = Vector2(180, FIELD_BOTTOM - 30)
-	_player_gun.hp_changed.connect(_refresh_hud.unbind(2))
-	_enemy_gun = GUN_SCENE.instantiate() as Gun
-	_enemy_gun.is_enemy = true
-	_enemy_gun.color = Palette.UI_RED
-	field.add_child(_enemy_gun)
-	_enemy_gun.position = Vector2(180, FIELD_TOP + 30)
-	_enemy_gun.hp_changed.connect(_refresh_hud.unbind(2))
-	# Any new square emits to us via spawner signal so we can wire destroy / escape.
+	var mode: GameMode = CurrentMatch.get_mode() if CurrentMatch else null
+	_team_size = mode.team_size if mode != null else 1
+	# Side positions — 1V1 uses centre gun; 2V2 splits left/right per side.
+	var player_positions: Array = _gun_positions(_team_size, FIELD_BOTTOM - 30)
+	var enemy_positions: Array = _gun_positions(_team_size, FIELD_TOP + 30)
+	for i in _team_size:
+		var p := GUN_SCENE.instantiate() as Gun
+		p.is_enemy = false
+		p.color = Palette.UI_CYAN if i == 0 else Palette.UI_GREEN  # ally bot = green
+		field.add_child(p)
+		p.position = player_positions[i]
+		p.hp_changed.connect(_refresh_hud.unbind(2))
+		_player_guns.append(p)
+	for i in _team_size:
+		var e := GUN_SCENE.instantiate() as Gun
+		e.is_enemy = true
+		e.color = Palette.UI_RED
+		field.add_child(e)
+		e.position = enemy_positions[i]
+		e.hp_changed.connect(_refresh_hud.unbind(2))
+		_enemy_guns.append(e)
+	_player_gun = _player_guns[0]
+	_enemy_gun = _enemy_guns[0]
 	spawner.square_spawned.connect(_on_square_spawned)
 	spawner.spawn_y = 390.0
+	# More targets for 2V2 — boost spawn rate.
+	if _team_size >= 2:
+		spawner.spawn_interval = 0.22
+
+func _gun_positions(count: int, y: float) -> Array:
+	# Single gun sits centre; duo splits left/right of centre.
+	if count <= 1:
+		return [Vector2(180, y)]
+	return [Vector2(100, y), Vector2(260, y)]
 
 func _apply_hud_style() -> void:
 	phase_label.add_theme_font_override("font", Palette.FONT_DISPLAY_BOLD)
@@ -111,15 +134,14 @@ func _process(delta: float) -> void:
 	if phase == Phase.OVER:
 		return
 	_time_left -= delta
-	# Escape check — any square that crosses the far edge on its destined
-	# side is an "defense miss" and credits the OPPOSITE player.
+	# Escape check — a square that exits the opposing team's side without
+	# being killed credits THIS team. ("Your defenders slipped one past
+	# the enemy.") Symmetric for opposite case.
 	for n in get_tree().get_nodes_in_group("volley_squares"):
 		var sq := n as Square
 		if sq == null or not is_instance_valid(sq):
 			continue
 		if sq.bound_for_enemy and sq.position.y < FIELD_TOP:
-			# Heading up past the enemy gun — your defence failed,
-			# opponent credited.
 			_player_score += _award_from_escape(sq)
 			sq.trigger_escape()
 		elif not sq.bound_for_enemy and sq.position.y > FIELD_BOTTOM:
@@ -189,10 +211,15 @@ func _refresh_hud() -> void:
 	timer_label.text = "%d:%02d" % [total_secs / 60, total_secs % 60]
 	player_score_label.text = "%d" % _player_score
 	enemy_score_label.text = "%d" % _enemy_score
-	if _player_gun:
-		player_hp_label.text = "HP %d" % int(_player_gun.hp)
-	if _enemy_gun:
-		enemy_hp_label.text = "HP %d" % int(_enemy_gun.hp)
+	# Sum HP across all guns on a side — 2V2 shows the team's combined HP.
+	var p_hp: int = 0
+	for g in _player_guns:
+		if is_instance_valid(g): p_hp += int(g.hp)
+	var e_hp: int = 0
+	for g in _enemy_guns:
+		if is_instance_valid(g): e_hp += int(g.hp)
+	player_hp_label.text = "HP %d" % p_hp
+	enemy_hp_label.text = "HP %d" % e_hp
 	if phase == Phase.OVERTIME:
 		hint_label.text = "▸ OVERTIME — LEAD BY %d TO WIN" % OT_MARGIN
 	elif _time_left <= 10.0:

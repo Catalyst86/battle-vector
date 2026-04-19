@@ -46,6 +46,14 @@ func _load() -> void:
 		data = PlayerProfileData.new()
 	_ensure_levels()
 	_apply_audio()
+	# Seed the Volley gun-module starter set + default loadout. Deferred so
+	# GunModules autoload (which depends on PlayerProfile being alive) has
+	# time to boot before we call into it.
+	call_deferred("_ensure_gun_modules")
+
+func _ensure_gun_modules() -> void:
+	if GunModules != null:
+		GunModules.ensure_starters()
 
 func _ensure_levels() -> void:
 	# Make sure every card in the pool has a level entry. New cards added

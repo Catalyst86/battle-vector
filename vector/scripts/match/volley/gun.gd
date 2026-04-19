@@ -36,13 +36,41 @@ var _stun_timer: float = 0.0
 var _aim_angle: float = 0.0  # visual barrel angle
 var _target_ref: Square = null
 
+## Effective stats derived from the player's module loadout. Applied on
+## _ready; computed once — no hot-swap mid-match.
+var _damage: float = SHOT_DAMAGE
+var _fire_interval: float = FIRE_INTERVAL
+var _heat_per_shot: float = HEAT_PER_SHOT
+var _range: float = SHOT_RANGE
+var _hp_max: float = HP_MAX
+var _regen_per_sec: float = 0.0
+var _stun_mult: float = 1.0
+
 const PROJECTILE_SCENE: PackedScene = preload("res://scenes/match/volley/gun_projectile.tscn")
 
 func _ready() -> void:
 	add_to_group("volley_guns")
 	add_to_group("volley_gun_enemy" if is_enemy else "volley_gun_player")
 	_aim_angle = PI * 0.5 if not is_enemy else -PI * 0.5
-	hp_changed.emit(hp, HP_MAX)
+	_apply_loadout()
+	hp_changed.emit(hp, _hp_max)
+
+func _apply_loadout() -> void:
+	# Enemy guns use the base stat profile for now — when networking lands
+	# they'll receive the opponent's loadout via replication.
+	if is_enemy or PlayerProfile == null or GunModules == null:
+		hp = HP_MAX
+		_hp_max = HP_MAX
+		return
+	var stats: Dictionary = GunModules.compute_stats(PlayerProfile.data.gun_loadout)
+	_damage        = SHOT_DAMAGE * float(stats.damage_mult)
+	_fire_interval = FIRE_INTERVAL / float(stats.fire_rate_mult)
+	_heat_per_shot = HEAT_PER_SHOT * float(stats.heat_mult)
+	_range         = SHOT_RANGE * float(stats.range_mult)
+	_hp_max        = HP_MAX + float(stats.hp_add)
+	hp             = _hp_max
+	_regen_per_sec = float(stats.regen_add)
+	_stun_mult     = float(stats.stun_mult)
 
 ## Called by Square units colliding with us (siege arrival) and by opposing
 ## spells like SURGE. Gates on reboot so dead guns don't double-die.
@@ -50,27 +78,31 @@ func take_damage(amount: float) -> void:
 	if _reboot_timer > 0.0 or hp <= 0.0:
 		return
 	hp = maxf(0.0, hp - amount)
-	hp_changed.emit(hp, HP_MAX)
+	hp_changed.emit(hp, _hp_max)
 	if hp <= 0.0:
 		_reboot_timer = REBOOT_DURATION
 		destroyed.emit()
 
 func apply_stun(seconds: float) -> void:
-	_stun_timer = maxf(_stun_timer, seconds)
+	_stun_timer = maxf(_stun_timer, seconds * _stun_mult)
 
 func _process(delta: float) -> void:
 	# Reboot + stun gate firing entirely.
 	if _reboot_timer > 0.0:
 		_reboot_timer -= delta
 		if _reboot_timer <= 0.0:
-			hp = HP_MAX * 0.5  # come back at half HP
-			hp_changed.emit(hp, HP_MAX)
+			hp = _hp_max * 0.5  # come back at half HP
+			hp_changed.emit(hp, _hp_max)
 		queue_redraw()
 		return
 	if _stun_timer > 0.0:
 		_stun_timer -= delta
 		queue_redraw()
 		return
+	# Passive HP regen from the REPAIR module.
+	if _regen_per_sec > 0.0 and hp < _hp_max:
+		hp = minf(_hp_max, hp + _regen_per_sec * delta)
+		hp_changed.emit(hp, _hp_max)
 	# Passive heat cooldown any frame we're not firing.
 	heat = maxf(0.0, heat - HEAT_COOLDOWN_PER_SEC * delta)
 	if _overheated and heat < HEAT_RESET_THRESHOLD:
@@ -86,8 +118,8 @@ func _process(delta: float) -> void:
 	_fire_cd = maxf(0.0, _fire_cd - delta)
 	if _target_ref != null and not _overheated and _fire_cd <= 0.0:
 		_fire(_target_ref)
-		_fire_cd = FIRE_INTERVAL
-		heat += HEAT_PER_SHOT
+		_fire_cd = _fire_interval
+		heat += _heat_per_shot
 		if heat >= HEAT_MAX:
 			heat = HEAT_MAX
 			_overheated = true
@@ -110,10 +142,10 @@ func _pick_target() -> Square:
 		if sq == null or not is_instance_valid(sq) or sq.hp <= 0.0:
 			continue
 		var dist: float = global_position.distance_to(sq.global_position)
-		if dist > SHOT_RANGE:
+		if dist > _range:
 			continue
 		var heading_us: bool = (sq.bound_for_enemy and is_enemy) or (not sq.bound_for_enemy and not is_enemy)
-		var priority: float = dist + (0.0 if heading_us else SHOT_RANGE)  # penalise other-lane
+		var priority: float = dist + (0.0 if heading_us else _range)  # penalise other-lane
 		priority += sq.hp * 8.0  # prefer cleaner kills
 		if priority < best_score:
 			best_score = priority
@@ -124,7 +156,7 @@ func _fire(sq: Square) -> void:
 	var p: GunProjectile = PROJECTILE_SCENE.instantiate() as GunProjectile
 	p.origin_is_enemy = is_enemy
 	p.color = color
-	p.damage = SHOT_DAMAGE
+	p.damage = _damage
 	get_parent().add_child(p)
 	p.global_position = global_position + Vector2.from_angle(_aim_angle) * 12.0
 	p.velocity = Vector2.from_angle(_aim_angle) * 620.0
@@ -160,7 +192,7 @@ func _draw() -> void:
 	if heat_frac > 0.0:
 		draw_arc(Vector2.ZERO, 18.0, -PI * 0.5, -PI * 0.5 + heat_frac * TAU, 24, heat_color, 1.5, true)
 	# HP ring — full ring underneath, fades from green → red as HP drops
-	var hp_frac: float = hp / HP_MAX
+	var hp_frac: float = hp / _hp_max
 	var hp_color: Color = Palette.UI_GREEN.lerp(Palette.UI_RED, 1.0 - hp_frac)
 	hp_color.a = 0.5
 	draw_arc(Vector2.ZERO, 22.0, 0.0, TAU * hp_frac, 48, hp_color, 2.0, true)

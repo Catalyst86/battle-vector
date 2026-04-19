@@ -7,6 +7,9 @@ extends Control
 signal confirmed(mode: StringName)
 
 var mode: StringName = &"1v1"
+## For Volley entries — tracks whether the user picked the 2V2 variant.
+## Default 1v1 (volley). Toggled via a chip in the body.
+var _volley_is_2v2: bool = false
 
 @onready var backdrop: ColorRect = $Backdrop
 @onready var sheet: PanelContainer = %Sheet
@@ -42,6 +45,8 @@ func _ready() -> void:
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sc.add_child(col)
 	col.add_child(_build_header())
+	if mode == &"volley":
+		col.add_child(_build_volley_team_toggle())
 	col.add_child(_build_opponent())
 	col.add_child(_build_loadout())
 	col.add_child(_build_rewards())
@@ -62,9 +67,78 @@ func _close() -> void:
 
 func _confirm() -> void:
 	SfxBank.play_ui(&"ui_confirm")
-	confirmed.emit(mode)
+	var emit_mode: StringName = mode
+	if mode == &"volley" and _volley_is_2v2:
+		emit_mode = &"volley_2v2"
+	confirmed.emit(emit_mode)
 	# Close quickly; parent will spawn the queue overlay.
 	queue_free()
+
+## Team-size chip row shown only when the parent opened this confirm with
+## mode=volley. The player picks SOLO (1V1) or DUO (2V2) before DEPLOY.
+func _build_volley_team_toggle() -> Control:
+	var panel: PanelContainer = TabHelpers.make_panel(Palette.UI_BG_1, Palette.UI_LINE_2)
+	var m: MarginContainer = TabHelpers.margin(12, 8, 12, 8)
+	panel.add_child(m)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 4)
+	m.add_child(vb)
+	vb.add_child(TabHelpers.label("▸ TEAM SIZE", 9, Palette.UI_TEXT_3))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	vb.add_child(row)
+	var solo := _team_chip("SOLO · 1V1", not _volley_is_2v2)
+	solo.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			_volley_is_2v2 = false
+			SfxBank.play_ui(&"ui_click")
+			_refresh_volley_chips(row))
+	var duo := _team_chip("DUO · 2V2", _volley_is_2v2)
+	duo.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			_volley_is_2v2 = true
+			SfxBank.play_ui(&"ui_click")
+			_refresh_volley_chips(row))
+	row.add_child(solo)
+	row.add_child(duo)
+	return panel
+
+func _team_chip(label: String, active: bool) -> PanelContainer:
+	var p := PanelContainer.new()
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	p.custom_minimum_size = Vector2(0, 36)
+	p.mouse_filter = Control.MOUSE_FILTER_STOP
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.357, 0.878, 1.0, 0.08) if active else Color(0, 0, 0, 0)
+	sb.border_color = Palette.UI_CYAN if active else Palette.UI_LINE_2
+	sb.border_width_top = 1; sb.border_width_bottom = 1
+	sb.border_width_left = 1; sb.border_width_right = 1
+	p.add_theme_stylebox_override("panel", sb)
+	var lbl: Label = TabHelpers.label(label, 11, Palette.UI_CYAN if active else Palette.UI_TEXT_2)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.add_theme_font_override("font", Palette.FONT_DISPLAY_BOLD)
+	var m := TabHelpers.margin(6, 6, 6, 6)
+	p.add_child(m)
+	m.add_child(lbl)
+	return p
+
+func _refresh_volley_chips(row: HBoxContainer) -> void:
+	for c in row.get_children():
+		c.queue_free()
+	var solo := _team_chip("SOLO · 1V1", not _volley_is_2v2)
+	solo.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			_volley_is_2v2 = false
+			SfxBank.play_ui(&"ui_click")
+			_refresh_volley_chips(row))
+	var duo := _team_chip("DUO · 2V2", _volley_is_2v2)
+	duo.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			_volley_is_2v2 = true
+			SfxBank.play_ui(&"ui_click")
+			_refresh_volley_chips(row))
+	row.add_child(solo)
+	row.add_child(duo)
 
 # ─── Sections ──────────────────────────────────────────────────────────────
 

@@ -29,6 +29,12 @@ enum Kind { SIEGE, INTERCEPTOR, SPELL }
 @export var shape: Shape = Shape.CIRCLE
 @export var role: Role = Role.SHOOTER
 @export var kind: Kind = Kind.SIEGE
+## Procedural silhouette id — when set, Unit._draw dispatches to the
+## matching function in `scripts/match/silhouettes.gd` instead of the
+## generic primitive Shape. Empty string = fall back to `shape` rendering.
+## See the Silhouettes header for the style vocabulary and the list of
+## registered ids.
+@export var silhouette_id: StringName = &""
 ## For SPELL cards only — id of the spell effect to fire on cast.
 ## One of: &"coolant" / &"overclock" / &"spread" / &"focus" / &"siphon" / &"surge".
 @export var spell_id: StringName = &""

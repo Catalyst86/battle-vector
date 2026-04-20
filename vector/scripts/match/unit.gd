@@ -496,11 +496,19 @@ func _draw() -> void:
 		var aura := card.color
 		aura.a = 0.06
 		draw_arc(Vector2.ZERO, card.aura_radius, 0.0, TAU, 48, aura, 1.0, true)
-	var rot: float = 0.0
-	match card.shape:
-		CardData.Shape.TRIANGLE, CardData.Shape.DIAMOND, CardData.Shape.STAR, CardData.Shape.CHEVRON:
-			rot = _age * 0.6
-	ShapeRenderer.draw_with_glow(self, card.shape, card.color, card.size, rot)
+	# Silhouette dispatch — if the card has a registered silhouette, draw
+	# the procedural vector art (jet, rocket, ship squadron, etc.) with
+	# direction-aware facing. Empty id falls back to the primitive Shape so
+	# unrolled cards keep rendering until they get their own silhouette.
+	if card.silhouette_id != &"" and Silhouettes.has(card.silhouette_id):
+		var facing: float = PI if is_enemy else 0.0
+		Silhouettes.draw(self, card.silhouette_id, card.color, card.size, _age, facing)
+	else:
+		var rot: float = 0.0
+		match card.shape:
+			CardData.Shape.TRIANGLE, CardData.Shape.DIAMOND, CardData.Shape.STAR, CardData.Shape.CHEVRON:
+				rot = _age * 0.6
+		ShapeRenderer.draw_with_glow(self, card.shape, card.color, card.size, rot)
 	var max_hp: float = card.hp * level_mult
 	if hp < max_hp and max_hp > 0.0:
 		var w: float = 20.0

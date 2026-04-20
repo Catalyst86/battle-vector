@@ -8,6 +8,7 @@ id = &"dart"
 display_name = "Dart"
 shape = 0
 role = 0
+silhouette_id = &"dart"
 color = Color(0.490, 0.827, 0.988, 1)
 description = "Shoots piercing bolts at enemies."
 cost = 2

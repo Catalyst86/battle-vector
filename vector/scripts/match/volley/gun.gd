@@ -79,9 +79,21 @@ func take_damage(amount: float) -> void:
 		return
 	hp = maxf(0.0, hp - amount)
 	hp_changed.emit(hp, _hp_max)
-	if hp <= 0.0:
+	# Lane-hit feedback on non-lethal damage — light thump + small shake so
+	# gun-side pressure reads as impact, not just a number ticking down.
+	if hp > 0.0:
+		SfxBank.play(&"hit_heavy", 0.06)
+		get_tree().call_group("match", "shake", 2.5)
+	else:
 		_reboot_timer = REBOOT_DURATION
 		destroyed.emit()
+		# Gun destruction is a major beat — fanfare SFX + big shake + brief
+		# hit-pause so the player feels the lane collapse.
+		SfxBank.play(&"death_heavy", 0.04)
+		get_tree().call_group("match", "shake", 10.0)
+		get_tree().call_group("match", "hit_pause", 0.10)
+		if PlayerProfile != null and not is_enemy:
+			PlayerProfile.buzz(120)
 
 func apply_stun(seconds: float) -> void:
 	_stun_timer = maxf(_stun_timer, seconds * _stun_mult)

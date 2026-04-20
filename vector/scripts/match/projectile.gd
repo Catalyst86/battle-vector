@@ -97,6 +97,8 @@ func _check_collisions(cfg: GameConfigData) -> void:
 			_hit_ids.append(id)
 			if u.has_method("take_damage"):
 				u.take_damage(damage)
+			# Hit SFX is emitted by the target's own take_damage (non-lethal)
+			# or its death SFX (lethal) — no need to double-fire here.
 			if not pierces:
 				_release()
 				return

@@ -9,7 +9,11 @@ extends Control
 @export var pip_color: Color = Color("fbbf24")
 @export var dim_color: Color = Color(1, 1, 1, 0.12)
 
+## Displayed mana value — lerps toward `_target_mana` each frame so deploys
+## read as a smooth drain rather than a snap. Callers still push the real
+## value via `set_value`.
 var _mana: float = 0.0
+var _target_mana: float = 0.0
 var _max: int = 10
 var _pulse_t: float = 0.0
 
@@ -19,6 +23,11 @@ func _ready() -> void:
 	queue_redraw()
 
 func _process(delta: float) -> void:
+	# Smooth the displayed value toward the target. Fast enough (8/sec) that
+	# a 2-cost deploy reads as a ~0.25s drain, slow enough to feel animated.
+	if absf(_mana - _target_mana) > 0.01:
+		_mana = move_toward(_mana, _target_mana, delta * 8.0)
+		queue_redraw()
 	if _mana >= float(_max) - 0.01:
 		_pulse_t += delta
 		queue_redraw()
@@ -27,9 +36,8 @@ func _process(delta: float) -> void:
 		queue_redraw()
 
 func set_value(mana: float, mana_max: int) -> void:
-	_mana = mana
+	_target_mana = mana
 	_max = max(1, mana_max)
-	queue_redraw()
 
 func _draw() -> void:
 	var n := pip_count

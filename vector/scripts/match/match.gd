@@ -581,8 +581,11 @@ func _on_unit_reached_base(side: int, world_pos: Vector2, damage: float) -> void
 			DailyOps.track(&"destroy_squares", hits)
 	else:
 		# side == 0 = our own base — nudge the player's phone so they feel
-		# the hit even if they're looking elsewhere on screen.
+		# the hit even if they're looking elsewhere on screen. Vignette
+		# pulse + small hit-pause sell the "taking fire" beat.
 		PlayerProfile.buzz(55)
+		pulse_vignette(0.45 + 0.05 * float(hits))
+		hit_pause(0.04)
 	_check_win()
 	_update_coach()
 
@@ -593,6 +596,46 @@ func shake(amount: float) -> void:
 	if PlayerProfile != null and PlayerProfile.data != null and not PlayerProfile.data.screen_shake_enabled:
 		return
 	_shake = maxf(_shake, amount)
+
+## Public: brief engine-wide hit-pause on significant events (kills with
+## shockwave, base hits, game-over beats). Scales time down to near-zero for
+## `seconds`, then restores — reads as a freeze-frame punctuating the hit.
+## Uses the ignore_time_scale timer param so the restore fires on wall-clock
+## time rather than stalling forever inside the pause itself.
+var _hit_pause_active: bool = false
+func hit_pause(seconds: float) -> void:
+	if seconds <= 0.0 or _hit_pause_active:
+		return
+	if PlayerProfile != null and PlayerProfile.data != null and not PlayerProfile.data.screen_shake_enabled:
+		return  # same toggle as shake — players who disable motion get no freeze either
+	_hit_pause_active = true
+	Engine.time_scale = 0.08
+	await get_tree().create_timer(seconds, true, false, true).timeout
+	Engine.time_scale = 1.0
+	_hit_pause_active = false
+
+## Public: pulse the vignette briefly when the player's base takes damage.
+## Ramps intensity up + tints red, then decays back. Gated to player-side
+## hits only so the enemy base taking damage (a win moment) doesn't punish
+## the player's screen.
+func pulse_vignette(strength: float = 0.55) -> void:
+	var vig: ColorRect = $Vignette/VignetteRect if has_node("Vignette/VignetteRect") else null
+	if vig == null or vig.material == null:
+		return
+	var mat: ShaderMaterial = vig.material as ShaderMaterial
+	if mat == null:
+		return
+	var base_intensity: float = 0.42
+	var base_tint: Color = Color(0, 0, 0, 1)
+	mat.set_shader_parameter("intensity", base_intensity + strength)
+	mat.set_shader_parameter("tint", Color(0.85, 0.2, 0.25, 1))
+	var tw := create_tween().set_parallel(true)
+	tw.tween_method(func(v: float):
+		mat.set_shader_parameter("intensity", v),
+		base_intensity + strength, base_intensity, 0.45).set_trans(Tween.TRANS_QUAD)
+	tw.tween_method(func(c: Color):
+		mat.set_shader_parameter("tint", c),
+		Color(0.85, 0.2, 0.25, 1), base_tint, 0.45).set_trans(Tween.TRANS_QUAD)
 
 func _update_shake(delta: float) -> void:
 	if _shake > 0.05:

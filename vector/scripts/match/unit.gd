@@ -93,6 +93,10 @@ func take_damage(amount: float) -> void:
 	_flash = 1.0
 	if hp <= 0.0:
 		_die()
+	elif card != null:
+		# Non-lethal hit — play the size-weighted hit SFX. Lethal hits fall
+		# through to _die() which emits the death SFX instead (no overlap).
+		SfxBank.play_event(card, &"hit")
 
 func _die() -> void:
 	if card != null:
@@ -102,6 +106,9 @@ func _die() -> void:
 			_aoe_damage(card.on_death_shockwave_radius, card.on_death_shockwave_damage * level_mult)
 			_spawn_fx(world_pos, card.on_death_shockwave_radius, card.color, 0.55)
 			get_tree().call_group("match", "shake", 6.0)
+			# Bigger units get a brief hit-pause on death — the shockwave
+			# kill reads as a beat rather than a blur.
+			get_tree().call_group("match", "hit_pause", 0.06)
 		else:
 			get_tree().call_group("match", "shake", 2.0)
 		if card.on_death_spawn != null:

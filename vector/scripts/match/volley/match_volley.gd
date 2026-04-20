@@ -264,6 +264,7 @@ func _on_square_destroyed(killer_is_enemy: bool, score: int) -> void:
 	_check_early_win()
 
 func _process(delta: float) -> void:
+	_update_shake(delta)
 	if phase == Phase.OVER:
 		return
 	# Mana regen — matches classic rate so deck-builders transfer feel.
@@ -440,6 +441,43 @@ func _end_match() -> void:
 		rewards.get("levels", 0),
 		"%d VS %d KILLS" % [_player_score, _enemy_score],
 	)
+
+## Public: brief engine-wide hit-pause on significant events (kills with
+## shockwave, gun destruction). Uses the ignore_time_scale timer param so
+## the restore fires on wall-clock time rather than stalling forever inside
+## the pause itself.
+var _hit_pause_active: bool = false
+func hit_pause(seconds: float) -> void:
+	if seconds <= 0.0 or _hit_pause_active:
+		return
+	if PlayerProfile != null and PlayerProfile.data != null and not PlayerProfile.data.screen_shake_enabled:
+		return
+	_hit_pause_active = true
+	Engine.time_scale = 0.08
+	await get_tree().create_timer(seconds, true, false, true).timeout
+	Engine.time_scale = 1.0
+	_hit_pause_active = false
+
+## Public: screen shake stub so `call_group("match", "shake", n)` from unit.gd
+## works in Volley too. Ramps a counter that's consumed by the viewport each
+## frame — simple because Volley's field is flat and doesn't translate.
+var _shake: float = 0.0
+var _field_base_pos: Vector2 = Vector2.ZERO
+func shake(amount: float) -> void:
+	if PlayerProfile != null and PlayerProfile.data != null and not PlayerProfile.data.screen_shake_enabled:
+		return
+	_shake = maxf(_shake, amount)
+
+func _update_shake(delta: float) -> void:
+	if field == null or not is_instance_valid(field):
+		return
+	if _shake > 0.05:
+		_shake = maxf(0.0, _shake - delta * 30.0)
+		field.position = _field_base_pos + Vector2(
+			randf_range(-_shake, _shake),
+			randf_range(-_shake, _shake))
+	elif field.position != _field_base_pos:
+		field.position = _field_base_pos
 
 func _refresh_hud() -> void:
 	var total_secs: int = maxi(0, int(ceil(_time_left)))

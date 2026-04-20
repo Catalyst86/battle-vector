@@ -57,6 +57,12 @@ func take_damage(amount: float, from_enemy: bool) -> void:
 		_spawn_death_fx()
 		destroyed.emit(from_enemy, _score)
 		queue_free()
+	elif tier == Tier.ARMORED or tier == Tier.ELITE or tier == Tier.BOSS:
+		# Only beefy tiers play hit SFX — standard/fast squares die in 1-2
+		# bolts and the death pop alone is feedback. Playing hit for every
+		# standard would be ~5 SFX/sec constant (~600 per match) and drown
+		# everything else.
+		SfxBank.play(&"hit_heavy", 0.08)
 
 ## Pop on kill — burst particle + tier-weighted SFX. Handoff calls this out
 ## as the single highest-impact feel uplift in the project; worth doing
@@ -71,7 +77,10 @@ func _spawn_death_fx() -> void:
 	var id: StringName = &"death_small"
 	if tier == Tier.ARMORED or tier == Tier.ELITE or tier == Tier.BOSS:
 		id = &"death_heavy"
-	SfxBank.play(id)
+	# Wider pitch spread (±10%) — a match destroys 300+ squares and the
+	# default ±4% blurs into a single drone by minute two. The extra range
+	# keeps each pop individually audible.
+	SfxBank.play(id, 0.10)
 
 func _process(delta: float) -> void:
 	_age += delta

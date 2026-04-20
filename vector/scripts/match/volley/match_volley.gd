@@ -31,9 +31,16 @@ const SCOUT_CARD: CardData = preload("res://data/cards/_scout.tres")
 const MATCH_SECONDS: float = 120.0
 const OVERTIME_SECONDS: float = 60.0
 const OT_MARGIN: int = 10  # overtime ends when a side leads by this many
+## Field bounds — extended slightly to give squares more runway (descent
+## distance drives how long the player has to react per spawn). Each side
+## gets ~315 px instead of ~270.
 const FIELD_TOP: float = 80.0
-const FIELD_BOTTOM: float = 680.0
-const MIDLINE_Y: float = 380.0
+const FIELD_BOTTOM: float = 700.0
+const MIDLINE_Y: float = 390.0
+## Square base descent speed override — slower than the Square default so
+## the board doesn't fill up. Combined with the longer field, squares spend
+## ~30% more time on screen per spawn.
+const SQUARE_BASE_SPEED: float = 55.0
 ## Mana economy — matches classic 1V1 defaults. Tuned later if needed.
 const MANA_MAX: int = 10
 const MANA_START: float = 6.0
@@ -42,7 +49,7 @@ const MANA_REGEN_PER_SEC: float = 1.0
 const DEPLOY_COOLDOWN: float = 0.4
 ## Seconds between bot spawn attempts. Aggression multiplier shortens this
 ## per-bot so high-arena opponents flood the board faster.
-const BOT_SPAWN_INTERVAL: float = 2.0
+const BOT_SPAWN_INTERVAL: float = 2.5
 
 class BotState:
 	var deck_cards: Array[CardData] = []
@@ -135,9 +142,16 @@ func _spawn_guns() -> void:
 	_enemy_gun = _enemy_guns[0]
 	spawner.square_spawned.connect(_on_square_spawned)
 	spawner.spawn_y = MIDLINE_Y
-	# More targets for 2V2 — boost spawn rate.
+	spawner.square_base_speed = SQUARE_BASE_SPEED
+	# Slower spawn cadence than the first MVP (0.35s) — the 2-minute match
+	# still produces 280+ squares in 1V1 which is plenty for the gun to
+	# chew on without the board feeling like a blizzard.
+	spawner.spawn_interval = 0.42
 	if _team_size >= 2:
-		spawner.spawn_interval = 0.22
+		# 2V2 doubles the gun count so we tick up spawn rate, but not as
+		# aggressively as before — the slower descent + longer field gives
+		# each square more screen time, so we don't need a flood to feel busy.
+		spawner.spawn_interval = 0.30
 
 func _setup_hand() -> void:
 	# Use the player's real deck. Tutorial mode doesn't apply in Volley (MVP).

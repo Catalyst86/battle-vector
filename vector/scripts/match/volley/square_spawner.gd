@@ -17,6 +17,10 @@ const SQUARE_SCENE: PackedScene = preload("res://scenes/match/volley/square.tscn
 @export var spawn_x_max: float = 330.0
 @export var spawn_y: float = 260.0
 @export var active: bool = true
+## Base descent speed assigned to each spawned square. Controller can lower
+## this to slow pacing (e.g. Volley bumps field size and slows squares so
+## the board doesn't feel like a blizzard). 0 = use Square's own default.
+@export var square_base_speed: float = 0.0
 
 var _cooldown: float = 0.0
 
@@ -33,6 +37,8 @@ func _spawn_one() -> void:
 	var sq: Square = SQUARE_SCENE.instantiate() as Square
 	sq.tier = _roll_tier()
 	sq.bound_for_enemy = randf() < 0.5
+	if square_base_speed > 0.0:
+		sq.base_speed = square_base_speed
 	get_parent().add_child(sq)
 	sq.position = Vector2(randf_range(spawn_x_min, spawn_x_max), spawn_y)
 	square_spawned.emit(sq)

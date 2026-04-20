@@ -389,3 +389,24 @@ Honourable mentions just below the cut: projectile-pool double-release safety (T
 ### 4. Surprises
 
 The single most striking thing is how much **good infrastructure is going unused**. SfxBank has `hit_light` and `hit_heavy` sitting in the bank, fully synthesised, never played — flip a single `play_event(card, &"hit")` call into `unit.gd:take_damage` and combat instantly feels twice as alive. `UnitRegistry` demonstrates the exact pattern needed for `volley_squares` and `walls` but only one team bothered to apply it. `GameOverOverlay._animate_reveal` is genuinely polished tween choreography — yet `ManaBar.set_value` is a hard snap. The project has the tools; it's missing the consistent application. Less flattering: the tutorial is literally unloseable because `_setup_bots` early-returns for tutorial mode (`match.gd:291–292`). Players form no failure model before their first real match, which makes Arena 1 the real difficulty spike. And the Volley handoff flags "Synergies are display-only" (`synergies.gd:5–6`) — if accurate, the entire deck-building meta is marketing, not mechanics. That's the audit's most important single question: is the pitch a lie?
+
+---
+
+## Corrigendum (post-audit verification)
+
+Two audit claims don't survive a closer read:
+
+**1. Synergies are NOT display-only.** `unit.gd:_synergy_multiplier()` (line 71) calls `Synergies.active_for()` and folds the bonus into `base_damage` on `Unit._ready()`. The comment in `synergies.gd:5–6` that triggered Tester 3's concern was stale — the effect hook has existed. Commit `8f8617d` rewrote the comment and added an in-match toast so the effect is visible to the player.
+
+**2. Oracle / Mortar DPS math was inverted.** Tester 3's table used `damage × fire_rate / cost`, but `fire_rate` in this codebase is the cooldown in seconds (see `unit.gd:_try_fire:292`, `_fire_cd = card.fire_rate`). Correct formula is `damage / fire_rate / cost`. Actual sniper-tier DPS/mana:
+
+| Card | Cost | Damage | Cooldown (s) | DPS | DPS/mana |
+|---|---|---|---|---|---|
+| Lance | 5 | 28 | 1.4 | 20.0 | 4.00 |
+| Mortar | 6 | 45 | 2.0 | 22.5 | 3.75 |
+| Oracle | 7 | 60 | 2.5 | 24.0 | 3.43 |
+| Beam | 6 | 12 | 0.3 | 40.0 | **6.67** |
+
+Oracle and Mortar were **slightly under-tuned**, not outliers. The real DPS outlier is **Beam** (L8 unlock, piercing) at 6.67 — almost 2× the rest of the sniper tier. Commit `<balance>` retunes: Oracle fr 2.5→2.0 (30 DPS, 4.29/mana), Mortar fr 2.0→1.7 (26.5 DPS, 4.41/mana), Beam damage 12→9 (30 DPS, 5.00/mana). Sniper cluster now spans 4.00–5.00/mana instead of 3.43–6.67 — still a hierarchy, much tighter.
+
+The build-diversity **4/10** score in the scorecard was partly based on this wrong math; with synergies confirmed live and the sniper cluster retuned, a fair re-score is probably **5–6/10**. The deeper issues (role-slot enforcement, small synergy graph) remain valid.

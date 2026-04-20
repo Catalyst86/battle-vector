@@ -16,5 +16,5 @@ hp = 35.0
 damage = 45.0
 speed = 0.0
 attack_range = 320.0
-fire_rate = 2.0
+fire_rate = 1.7
 size = 18.0

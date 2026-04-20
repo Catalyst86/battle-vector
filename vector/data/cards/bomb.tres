@@ -8,6 +8,7 @@ id = &"bomb"
 display_name = "Bomb"
 shape = 1
 role = 1
+silhouette_id = &"bomb"
 color = Color(0.984, 0.443, 0.522, 1)
 description = "Walks up and detonates. AoE."
 cost = 4

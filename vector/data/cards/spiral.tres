@@ -9,6 +9,7 @@ rarity = &"rare"
 display_name = "Spiral"
 shape = 7
 role = 2
+silhouette_id = &"spiral"
 color = Color(0.753, 0.518, 0.988, 1)
 description = "Bores through walls. Ignores units."
 cost = 3

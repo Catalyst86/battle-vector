@@ -9,6 +9,7 @@ rarity = &"epic"
 display_name = "Pulse"
 shape = 4
 role = 3
+silhouette_id = &"pulse"
 color = Color(0.655, 0.545, 0.980, 1)
 description = "Hunts enemies. Shockwave on kill."
 cost = 5

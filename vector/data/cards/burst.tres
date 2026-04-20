@@ -9,6 +9,7 @@ rarity = &"rare"
 display_name = "Burst"
 shape = 5
 role = 3
+silhouette_id = &"burst"
 color = Color(0.984, 0.749, 0.141, 1)
 description = "Chases and rams enemies."
 cost = 3

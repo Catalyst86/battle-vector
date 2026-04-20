@@ -8,6 +8,7 @@ id = &"scout"
 display_name = "Scout"
 shape = 6
 role = 0
+silhouette_id = &"scout"
 color = Color(0.957, 0.447, 0.714, 1)
 description = "Internal — spawned by Chevron's swarm."
 cost = 0

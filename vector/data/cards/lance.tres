@@ -9,6 +9,7 @@ rarity = &"epic"
 display_name = "Lance"
 shape = 2
 role = 4
+silhouette_id = &"lance"
 color = Color(0.404, 0.910, 0.976, 1)
 description = "Stationary. Long-range base shot."
 cost = 5

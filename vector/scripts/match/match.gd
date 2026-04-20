@@ -453,7 +453,25 @@ func _start_match() -> void:
 	_refresh_ui()
 	_update_hint()
 	_update_coach()
+	_announce_synergies()
 	_show_match_start_countdown()
+
+## Surface active deck synergies at match start — a quick toast so the
+## player sees which pairs their deck unlocked. Tutorial mode skips this
+## to keep the onboarding flow uncluttered.
+func _announce_synergies() -> void:
+	if _mode != null and _mode.is_tutorial:
+		return
+	if Synergies == null or PlayerDeck == null:
+		return
+	var deck_ids: Array = []
+	for c in deck:
+		if c != null:
+			deck_ids.append(c.id)
+	var label: String = Synergies.active_label(deck_ids)
+	if label == "" or Toast == null:
+		return
+	Toast.notify("▸ SYNERGY: %s" % label, 2.4)
 
 ## Drops a full-screen "3 · 2 · 1 · GO" overlay after BUILD ends — gives the
 ## player a beat to orient before bot units start pouring in.

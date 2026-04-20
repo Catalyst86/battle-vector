@@ -89,6 +89,21 @@ func _ready() -> void:
 	_refresh_hud()
 	SfxBank.play(&"match_start")
 	PlayerProfile.buzz(40)
+	_announce_synergies()
+
+## Surface active deck synergies at match start — same pattern as classic
+## so the player sees which pairs their deck unlocked. Fires once on load.
+func _announce_synergies() -> void:
+	if Synergies == null or _deck.is_empty():
+		return
+	var ids: Array = []
+	for c in _deck:
+		if c != null:
+			ids.append(c.id)
+	var label: String = Synergies.active_label(ids)
+	if label == "" or Toast == null:
+		return
+	Toast.notify("▸ SYNERGY: %s" % label, 2.4)
 
 var _player_guns: Array[Gun] = []
 var _enemy_guns: Array[Gun] = []

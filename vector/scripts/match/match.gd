@@ -205,6 +205,11 @@ func _show_tutorial_briefing() -> void:
 ## and button styleboxes. Done in code rather than .tscn edits so we don't
 ## disturb the scene's anchors / unique-name wiring.
 func _apply_tactical_hud() -> void:
+	# Defensive — snap the vignette back to neutral on every match boot.
+	# The .tscn sub_resource should already carry the baseline, but a
+	# rematch right after a defeat-pulse can leave the shared shader state
+	# mid-decay; this makes the reset explicit.
+	_reset_vignette()
 	# Top HUD ── phase label becomes a bordered cyan pill.
 	phase_label.add_theme_font_override("font", Palette.FONT_DISPLAY_BOLD)
 	phase_label.add_theme_font_size_override("font_size", 11)
@@ -637,23 +642,39 @@ func hit_pause(seconds: float) -> void:
 ## hits only so the enemy base taking damage (a win moment) doesn't punish
 ## the player's screen.
 func pulse_vignette(strength: float = 0.55) -> void:
-	var vig: ColorRect = $Vignette/VignetteRect if has_node("Vignette/VignetteRect") else null
-	if vig == null or vig.material == null:
-		return
-	var mat: ShaderMaterial = vig.material as ShaderMaterial
+	var mat: ShaderMaterial = _vignette_material()
 	if mat == null:
 		return
 	var base_intensity: float = 0.42
 	var base_tint: Color = Color(0, 0, 0, 1)
 	mat.set_shader_parameter("intensity", base_intensity + strength)
 	mat.set_shader_parameter("tint", Color(0.85, 0.2, 0.25, 1))
-	var tw := create_tween().set_parallel(true)
+	# TWEEN_PAUSE_PROCESS so the decay keeps ticking if the tree pauses
+	# mid-pulse (e.g. when _end_match fires right after the killing hit).
+	var tw := create_tween().set_parallel(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	tw.tween_method(func(v: float):
 		mat.set_shader_parameter("intensity", v),
 		base_intensity + strength, base_intensity, 0.45).set_trans(Tween.TRANS_QUAD)
 	tw.tween_method(func(c: Color):
 		mat.set_shader_parameter("tint", c),
 		Color(0.85, 0.2, 0.25, 1), base_tint, 0.45).set_trans(Tween.TRANS_QUAD)
+
+## Snap the vignette back to its neutral baseline. Called on match entry
+## (defensive against sub-resource sharing across scene loads) and before
+## pausing on _end_match so the red pulse from the final base hit doesn't
+## bleed into the REMATCH transition.
+func _reset_vignette() -> void:
+	var mat: ShaderMaterial = _vignette_material()
+	if mat == null:
+		return
+	mat.set_shader_parameter("intensity", 0.42)
+	mat.set_shader_parameter("tint", Color(0, 0, 0, 1))
+
+func _vignette_material() -> ShaderMaterial:
+	var vig: ColorRect = $Vignette/VignetteRect if has_node("Vignette/VignetteRect") else null
+	if vig == null or vig.material == null:
+		return null
+	return vig.material as ShaderMaterial
 
 func _update_shake(delta: float) -> void:
 	if _shake > 0.05:
@@ -699,6 +720,10 @@ func _end_match(result: String) -> void:
 	phase = Phase.OVER
 	preview.hide_preview()
 	_selected = null
+	# Snap the vignette back to neutral before pausing — a final base-hit
+	# pulse would otherwise freeze red underneath the game-over overlay
+	# and persist into the next scene if the player hits REMATCH fast.
+	_reset_vignette()
 	# Victory-only quest flushes.
 	if result == "VICTORY" and DailyOps != null:
 		if _stats_roles_played.size() >= 5:

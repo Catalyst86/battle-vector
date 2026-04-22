@@ -15,7 +15,19 @@ const PAIRS: Array[Dictionary] = [
 	{ "a": &"chevron", "b": &"orb",     "label": "SWARM COVER",     "bonus": 0.10 },
 	{ "a": &"burst",   "b": &"chevron", "label": "STAGGER WAVE",    "bonus": 0.08 },
 	{ "a": &"pulse",   "b": &"lance",   "label": "LOCK-ON RELAY",   "bonus": 0.20 },
+	# Audit C3 additions — reach into the long tail so more cards have a
+	# partner. Keeps bonuses small (0.10–0.15) so stacking stays bounded.
+	{ "a": &"mortar",  "b": &"shard",   "label": "MULTI-LOCK",      "bonus": 0.12 },
+	{ "a": &"revenant","b": &"chevron", "label": "GRAVE SWARM",     "bonus": 0.15 },
+	{ "a": &"beacon",  "b": &"dart",    "label": "GUIDED FIRE",     "bonus": 0.10 },
+	{ "a": &"chorus",  "b": &"flock",   "label": "HIVE SANCTUARY",  "bonus": 0.10 },
 ]
+
+## Stacking cap for synergy multipliers. Adversarial review of the audit
+## fix plan flagged that more pairs = more multiplicative power. Capped
+## so no unit exceeds +50% from synergies alone (still stackable with
+## buffer auras and level_mult — those are separate multipliers).
+const MAX_STACK_BONUS: float = 0.50
 
 ## Returns the synergies active for the supplied deck (array of card ids).
 func active_for(card_ids: Array) -> Array[Dictionary]:

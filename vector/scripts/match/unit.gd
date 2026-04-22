@@ -76,7 +76,9 @@ func _exit_tree() -> void:
 
 ## Compute damage multiplier from active deck synergies. Only the player's
 ## team benefits — bot decks don't participate (matches the Deck-tab UI,
-## which only shows synergies for the player's loadout).
+## which only shows synergies for the player's loadout). Stack cap is
+## enforced via Synergies.MAX_STACK_BONUS so three overlapping synergies
+## can't multiplicatively compound into a runaway damage source.
 func _synergy_multiplier() -> float:
 	if is_enemy or Synergies == null or PlayerDeck == null:
 		return 1.0
@@ -84,11 +86,12 @@ func _synergy_multiplier() -> float:
 	for c in PlayerDeck.cards:
 		deck_ids.append(c.id)
 	var active: Array = Synergies.active_for(deck_ids)
-	var mult: float = 1.0
+	var bonus: float = 0.0
 	for pair in active:
 		if card.id == pair.a or card.id == pair.b:
-			mult += float(pair.bonus)
-	return mult
+			bonus += float(pair.bonus)
+	bonus = minf(bonus, Synergies.MAX_STACK_BONUS)
+	return 1.0 + bonus
 
 func spawn_at(pos: Vector2) -> void:
 	world_pos = pos

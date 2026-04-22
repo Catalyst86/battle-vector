@@ -151,29 +151,37 @@ text = "0"
 offset_left = 12.0
 offset_top = 68.0
 offset_right = 348.0
-offset_bottom = 84.0
-theme_override_constants/separation = 8
+offset_bottom = 86.0
+theme_override_constants/separation = 6
 
 [node name="ManaLabel" type="Label" parent="HUD/ManaRow"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(64, 0)
+custom_minimum_size = Vector2(62, 0)
 theme_override_font_sizes/font_size = 11
 text = "⚡ 6/10"
 
 [node name="ManaBar" parent="HUD/ManaRow" instance=ExtResource("6")]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(180, 10)
+custom_minimum_size = Vector2(60, 10)
+size_flags_horizontal = 3
 size_flags_vertical = 4
 
 [node name="EnemyManaLabel" type="Label" parent="HUD/ManaRow"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(70, 0)
+custom_minimum_size = Vector2(60, 0)
 theme_override_font_sizes/font_size = 11
 text = "⚡ 6/10"
 horizontal_alignment = 2
+
+[node name="LinkButton" type="Button" parent="HUD/ManaRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(58, 0)
+theme_override_font_sizes/font_size = 10
+text = "⚡ LINK"
 
 [node name="HintLabel" type="Label" parent="HUD"]
 unique_name_in_owner = true

@@ -27,6 +27,7 @@ const SCOUT_CARD: CardData = preload("res://data/cards/_scout.tres")
 @onready var mana_bar: ManaBar = %ManaBar
 @onready var mana_label: Label = %ManaLabel
 @onready var enemy_mana_label: Label = %EnemyManaLabel
+@onready var link_button: Button = %LinkButton
 
 const MATCH_SECONDS: float = 120.0
 const OVERTIME_SECONDS: float = 60.0
@@ -45,6 +46,15 @@ const CATCHUP_MAX_BONUS: float = 0.5  # +50% regen at max deficit
 ## for RIFT_BOOST_SECONDS, then the rift resets and can be captured again.
 const RIFT_BOOST_SECONDS: float = 12.0
 const RIFT_BOOST_REGEN_MULT: float = 2.0
+## Vector Link — fuse two player units into one super-piece with combined
+## HP and multiplied damage. Two charges per match, slow recharge so the
+## mechanic reads as a tactical moment rather than spam.
+const LINK_MAX_CHARGES: int = 2
+const LINK_RECHARGE_SECONDS: float = 25.0
+const LINK_HP_FACTOR: float = 0.85    # (A.hp + B.hp) × this
+const LINK_DAMAGE_FACTOR: float = 1.6  # (A.dmg + B.dmg) × this
+const LINK_SIZE_FACTOR: float = 1.20   # larger sprite for the fused unit
+const LINK_SELECT_RADIUS: float = 44.0 # tap-to-select hitbox on the field
 ## Field bounds — extended slightly to give squares more runway (descent
 ## distance drives how long the player has to react per spawn). Each side
 ## gets ~315 px instead of ~270.
@@ -95,6 +105,13 @@ var _rift: OvertimeRift = null
 var _rift_boost_team_is_enemy: bool = false
 var _rift_boost_remaining: float = 0.0
 
+## Vector Link state — charges tick back up while idle; link mode is the
+## two-tap selection flow triggered by the LINK button.
+var _link_charges: int = LINK_MAX_CHARGES
+var _link_recharge_t: float = 0.0
+var _link_mode: bool = false
+var _link_first: Node2D = null
+
 func _ready() -> void:
 	add_to_group("match")
 	get_tree().paused = false
@@ -111,6 +128,8 @@ func _ready() -> void:
 	_spawn_guns()
 	_setup_hand()
 	_setup_bots()
+	link_button.pressed.connect(_on_link_button_pressed)
+	_update_link_button()
 	# Kick off SURGE — full mana for everyone so the first 20 seconds are
 	# a kinetic opening rather than waiting for the pip bar to fill.
 	_mana = float(MANA_MAX)
@@ -311,6 +330,28 @@ func _apply_hud_style() -> void:
 		back_btn.add_theme_stylebox_override(sn, exit_sb)
 	back_btn.add_theme_font_override("font", Palette.FONT_DISPLAY)
 	back_btn.add_theme_color_override("font_color", Palette.UI_TEXT_1)
+	# Link button — amber accent with a small glow so it reads as the
+	# tactical "active" button on the top strip without stealing the
+	# phase label's amber SURGE focus.
+	var link_sb := StyleBoxFlat.new()
+	link_sb.bg_color = Palette.UI_BG_1
+	link_sb.border_color = Palette.UI_AMBER
+	link_sb.border_width_top = 1; link_sb.border_width_bottom = 1
+	link_sb.border_width_left = 1; link_sb.border_width_right = 1
+	link_sb.shadow_color = Palette.UI_AMBER_GLOW
+	link_sb.shadow_size = 3
+	var link_disabled_sb := StyleBoxFlat.new()
+	link_disabled_sb.bg_color = Palette.UI_BG_1
+	link_disabled_sb.border_color = Palette.UI_LINE_2
+	link_disabled_sb.border_width_top = 1; link_disabled_sb.border_width_bottom = 1
+	link_disabled_sb.border_width_left = 1; link_disabled_sb.border_width_right = 1
+	for sn in ["normal", "hover", "pressed", "focus"]:
+		link_button.add_theme_stylebox_override(sn, link_sb)
+	link_button.add_theme_stylebox_override("disabled", link_disabled_sb)
+	link_button.add_theme_font_override("font", Palette.FONT_DISPLAY_BOLD)
+	link_button.add_theme_color_override("font_color", Palette.UI_AMBER)
+	link_button.add_theme_color_override("font_hover_color", Palette.UI_AMBER.lightened(0.15))
+	link_button.add_theme_color_override("font_disabled_color", Palette.UI_TEXT_3)
 
 func _on_square_spawned(sq: Square) -> void:
 	sq.destroyed.connect(_on_square_destroyed)
@@ -371,6 +412,15 @@ func _process(delta: float) -> void:
 		if b.timer >= BOT_SPAWN_INTERVAL / aggro_mult:
 			b.timer = 0.0
 			_bot_try_spawn(b)
+	# Vector Link charge recharge — ticks whenever below max and not
+	# actively in link mode (small quality-of-life: the timer pauses while
+	# the player is mid-selection so they don't get a "surprise" charge).
+	if _link_charges < LINK_MAX_CHARGES and not _link_mode:
+		_link_recharge_t += delta
+		if _link_recharge_t >= LINK_RECHARGE_SECONDS:
+			_link_recharge_t = 0.0
+			_link_charges += 1
+		_update_link_button()  # refresh countdown text every frame
 	_time_left -= delta
 	# Escape check — a square that exits the opposing team's side without
 	# being killed credits THIS team. ("Your defenders slipped one past
@@ -396,6 +446,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var m := event as InputEventMouseButton
 	if not (m.pressed and m.button_index == MOUSE_BUTTON_LEFT):
+		return
+	# Link mode swallows ALL field taps — the player is picking a unit,
+	# not deploying. Tap a unit to select first/fuse; tap empty = cancel.
+	if _link_mode:
+		_handle_link_tap(m.position)
 		return
 	if _selected != null:
 		_try_deploy(m.position)
@@ -569,6 +624,157 @@ func _end_match() -> void:
 		rewards.get("levels", 0),
 		"%d VS %d KILLS" % [_player_score, _enemy_score],
 	)
+
+# ─── Vector Link ───────────────────────────────────────────────────────────
+
+func _on_link_button_pressed() -> void:
+	SfxBank.play_ui(&"ui_click")
+	if _link_mode:
+		_exit_link_mode()
+		return
+	if _link_charges <= 0:
+		if Toast != null:
+			Toast.notify("▸ LINK RECHARGING", 1.0)
+		return
+	# Need at least two player-side units on the field to have something
+	# to fuse. Short-circuit with a toast so the mode doesn't enter empty.
+	var n: int = 0
+	if UnitRegistry != null:
+		for u in UnitRegistry.player_team:
+			if is_instance_valid(u):
+				n += 1
+				if n >= 2:
+					break
+	if n < 2:
+		if Toast != null:
+			Toast.notify("▸ NEED TWO ALLIED UNITS", 1.0)
+		return
+	_link_mode = true
+	_link_first = null
+	_update_link_button()
+	hint_label.text = "▸ TAP TWO ALLIED UNITS TO LINK"
+
+func _exit_link_mode() -> void:
+	_link_mode = false
+	_link_first = null
+	_update_link_button()
+	_update_hint()
+
+func _handle_link_tap(screen: Vector2) -> void:
+	var unit: Node2D = _nearest_player_unit(screen, LINK_SELECT_RADIUS)
+	if unit == null:
+		# Tap on empty space → cancel rather than silently consume.
+		_exit_link_mode()
+		return
+	if _link_first == null:
+		_link_first = unit
+		hint_label.text = "▸ TAP SECOND UNIT"
+		return
+	if unit == _link_first:
+		# Tapped the same unit twice — treat as "never mind" and keep the
+		# selection alive so the player can pick a different second.
+		return
+	_try_fuse(_link_first, unit)
+
+## Returns the nearest Unit on the player team within `max_dist` of the
+## tapped screen position. In Volley, unit.world_pos equals screen-local
+## position (flat render) so we can compare directly.
+func _nearest_player_unit(pos: Vector2, max_dist: float) -> Node2D:
+	if UnitRegistry == null:
+		return null
+	var best: Node2D = null
+	var best_d: float = max_dist
+	for u in UnitRegistry.player_team:
+		if not is_instance_valid(u):
+			continue
+		var n := u as Node2D
+		if n == null:
+			continue
+		var d: float = pos.distance_to(n.world_pos)
+		if d < best_d:
+			best_d = d
+			best = n
+	return best
+
+## Fuse two units — spawn a LinkBeam between them, despawn both, and
+## create a new fused Unit at the midpoint with combined HP, multiplied
+## damage, averaged stats, and a blended colour. Stats are overridden
+## post-_ready so the fused unit isn't re-multiplied by level_mult /
+## synergy (those already baked into the source units' current values).
+func _try_fuse(a: Node2D, b: Node2D) -> void:
+	if not is_instance_valid(a) or not is_instance_valid(b):
+		_exit_link_mode()
+		return
+	var card_a: CardData = a.card
+	var card_b: CardData = b.card
+	if card_a == null or card_b == null:
+		_exit_link_mode()
+		return
+	var midpoint: Vector2 = (a.world_pos + b.world_pos) * 0.5
+	var blended: Color = card_a.color.lerp(card_b.color, 0.5)
+	# Build the fused CardData (runtime-duplicated; lives only for this
+	# unit's lifetime, isn't saved anywhere).
+	var fused_card: CardData = card_a.duplicate() as CardData
+	fused_card.color = blended
+	fused_card.size = maxf(card_a.size, card_b.size) * LINK_SIZE_FACTOR
+	fused_card.speed = (card_a.speed + card_b.speed) * 0.5
+	fused_card.display_name = "%s+%s" % [card_a.display_name, card_b.display_name]
+	# Clear the silhouette id — the fused unit's combined colour + bigger
+	# size reads distinctly against its source parts, and there's no
+	# dedicated fused-silhouette art yet. Falls back to the primitive.
+	fused_card.silhouette_id = &""
+	# Beam VFX — fires BEFORE we queue_free so we still have valid world
+	# positions. The beam node lives on the field so it inherits flat
+	# rendering / shake transforms.
+	var beam := LinkBeam.new()
+	field.add_child(beam)
+	beam.setup(a.world_pos, b.world_pos, blended)
+	# Burst + shake + haptic to sell the beat.
+	SfxBank.play(&"match_start", 0.15)
+	get_tree().call_group("match", "shake", 5.0)
+	if PlayerProfile != null:
+		PlayerProfile.buzz(80)
+	# Combine stats using the source units' CURRENT values so a half-dead
+	# unit contributes its remaining HP rather than its base HP.
+	var combined_hp: float = (a.hp + b.hp) * LINK_HP_FACTOR
+	var combined_damage: float = (a.base_damage + b.base_damage) * LINK_DAMAGE_FACTOR
+	# Remove the source units.
+	a.queue_free()
+	b.queue_free()
+	# Spawn the fused unit — route through the regular volley pipeline so
+	# _volley_gun_target gets wired like any other player-side deploy.
+	var fused := UNIT_SCENE.instantiate()
+	fused.card = fused_card
+	fused.is_enemy = false
+	field.add_child(fused)
+	fused.spawn_at(midpoint)
+	fused._volley_gun_target = _pick_target_gun(midpoint, false)
+	# Override stats AFTER _ready so we don't get re-multiplied. level_mult
+	# = 1.0 keeps downstream _refresh_effective_damage honest.
+	fused.level_mult = 1.0
+	fused.hp = combined_hp
+	fused.base_damage = combined_damage
+	fused.effective_damage = combined_damage
+	# Spend the charge, reset the recharge timer, exit mode.
+	_link_charges -= 1
+	_link_recharge_t = 0.0
+	_exit_link_mode()
+	if Toast != null:
+		Toast.notify("▸ %s" % fused_card.display_name.to_upper(), 1.6)
+
+func _update_link_button() -> void:
+	if link_button == null:
+		return
+	if _link_mode:
+		link_button.text = "▸ PICK"
+		link_button.disabled = false
+	elif _link_charges <= 0:
+		var secs: int = maxi(0, int(ceil(LINK_RECHARGE_SECONDS - _link_recharge_t)))
+		link_button.text = "⚡ %ds" % secs
+		link_button.disabled = true
+	else:
+		link_button.text = "⚡ LINK ×%d" % _link_charges
+		link_button.disabled = false
 
 ## Public: brief engine-wide hit-pause on significant events (kills with
 ## shockwave, gun destruction). Uses the ignore_time_scale timer param so

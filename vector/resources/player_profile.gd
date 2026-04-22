@@ -19,6 +19,9 @@ extends Resource
 @export var tutorial_completed: bool = false
 ## Unix timestamp of the last free-chest claim. 0 = never claimed.
 @export var last_free_chest_ts: int = 0
+## Unix timestamp of the most recent login (set on PlayerProfile._ready).
+## Drives the returning-player catch-up chest after 48h+ absence.
+@export var last_login_ts: int = 0
 ## Map of card_id (StringName) → level (int, starts at 1).
 @export var card_levels: Dictionary = {}
 

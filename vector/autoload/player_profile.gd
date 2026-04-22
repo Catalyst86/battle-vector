@@ -35,6 +35,13 @@ const FREE_CHEST_GOLD_MAX: int = 160
 const FREE_CHEST_XP_MIN: int = 30
 const FREE_CHEST_XP_MAX: int = 80
 
+## Returning-player catch-up. If `last_login_ts` was more than this many
+## seconds ago, grant a welcome-back chest scaled by days-absent, capped
+## so lapsed players don't return to infinite gold.
+const CATCHUP_THRESHOLD_SECONDS: int = 172800  # 48 hours
+const CATCHUP_GOLD_PER_DAY: int = 90           # roughly one match's worth
+const CATCHUP_MAX_DAYS: int = 14               # ~14 days of catch-up max
+
 signal changed
 
 var data: PlayerProfileData
@@ -49,10 +56,31 @@ func _load() -> void:
 		data = PlayerProfileData.new()
 	_ensure_levels()
 	_apply_audio()
+	_check_return_bonus()
 	# Seed the Volley gun-module starter set + default loadout. Deferred so
 	# GunModules autoload (which depends on PlayerProfile being alive) has
 	# time to boot before we call into it.
 	call_deferred("_ensure_gun_modules")
+
+## Audit H5 — returning-player catch-up. If the player has been away more
+## than 48h, grant a welcome-back chest scaled by days-absent (capped at
+## 14 days). Runs once per session on PlayerProfile load. Skipped entirely
+## for brand-new profiles (last_login_ts == 0 means first boot).
+func _check_return_bonus() -> void:
+	var now: int = int(Time.get_unix_time_from_system())
+	var last: int = data.last_login_ts
+	data.last_login_ts = now
+	if last == 0:
+		return  # first launch — no catch-up
+	var gap: int = now - last
+	if gap < CATCHUP_THRESHOLD_SECONDS:
+		return
+	var days_absent: int = mini(gap / 86400, CATCHUP_MAX_DAYS)
+	var bonus_gold: int = days_absent * CATCHUP_GOLD_PER_DAY
+	data.gold += bonus_gold
+	save()
+	if Toast != null:
+		Toast.notify("▸ WELCOME BACK · +%d GOLD" % bonus_gold, 3.0)
 
 func _ensure_gun_modules() -> void:
 	if GunModules != null:

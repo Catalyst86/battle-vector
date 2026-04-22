@@ -84,9 +84,11 @@ func _draw() -> void:
 	# the Collection matches the on-field piece. Empty id falls back.
 	var icon_size: float = 14.0
 	var icon_center := Vector2(size.x * 0.5, 28.0)
-	draw_set_transform(icon_center, 0.0, Vector2.ONE)
 	if card.silhouette_id != &"" and Silhouettes.has(card.silhouette_id):
-		Silhouettes.draw(self, card.silhouette_id, card.color, icon_size, _t, 0.0)
+		# Silhouettes owns its own transform — pass origin instead of
+		# pre-setting one (which the dispatcher would overwrite).
+		Silhouettes.draw(self, card.silhouette_id, card.color, icon_size, _t, 0.0, icon_center)
 	else:
+		draw_set_transform(icon_center, 0.0, Vector2.ONE)
 		ShapeRenderer.draw(self, card.shape, card.color, icon_size, 0.0)
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

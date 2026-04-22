@@ -49,12 +49,16 @@ func from_card(c: CardData) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	var center := size * 0.5
-	draw_set_transform(center, 0.0, Vector2.ONE)
+	var center: Vector2 = size * 0.5
 	if silhouette_id != &"" and Silhouettes.has(silhouette_id):
-		Silhouettes.draw(self, silhouette_id, color, icon_size, _t, 0.0)
-	elif glow:
-		ShapeRenderer.draw_with_glow(self, shape, color, icon_size, 0.0)
+		# Silhouettes.draw owns its own transform — pass the container's
+		# centre as the origin. Pre-setting a transform here would be
+		# overwritten inside the dispatcher.
+		Silhouettes.draw(self, silhouette_id, color, icon_size, _t, 0.0, center)
 	else:
-		ShapeRenderer.draw(self, shape, color, icon_size, 0.0)
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		draw_set_transform(center, 0.0, Vector2.ONE)
+		if glow:
+			ShapeRenderer.draw_with_glow(self, shape, color, icon_size, 0.0)
+		else:
+			ShapeRenderer.draw(self, shape, color, icon_size, 0.0)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

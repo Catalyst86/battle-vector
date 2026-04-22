@@ -65,11 +65,26 @@ static func has(id: StringName) -> bool:
 
 ## Draws the silhouette with the triple-pass fake-bloom wrapper. `facing`
 ## (radians) rotates the whole silhouette — use it so enemy-side pieces
-## point at their destination. `t` drives procedural animation.
-static func draw(ci: CanvasItem, id: StringName, color: Color, size: float, t: float, facing: float = 0.0) -> void:
+## point at their destination. `t` drives procedural animation. `origin`
+## is the position (in the caller's local coord space) where the
+## silhouette should be centred — pass the midpoint of an icon Control
+## when drawing into a menu tile, or leave at Vector2.ZERO to draw at
+## the caller's own origin (on-field units).
+##
+## NOTE: this function sets the CanvasItem's draw transform, so any
+## draw_set_transform the caller applied before calling this gets
+## overridden. Pass the target position via `origin` instead.
+static func draw(ci: CanvasItem, id: StringName, color: Color, size: float, t: float, facing: float = 0.0, origin: Vector2 = Vector2.ZERO) -> void:
 	if not IDS.has(id):
 		return
-	ci.draw_set_transform(Vector2.ZERO, facing, Vector2.ONE)
+	# Silhouettes draw nose-up (fuselage extends from -size*0.95 to
+	# ~size*0.70), so their visual midpoint sits ~12% of size above
+	# local 0,0. Shift the draw origin down by that amount (rotated
+	# with facing so enemy-flipped silhouettes compensate the other
+	# way) — the silhouette then appears centred on the caller's
+	# requested position.
+	var bias: Vector2 = Vector2(0, size * 0.12).rotated(facing)
+	ci.draw_set_transform(origin + bias, facing, Vector2.ONE)
 	_dispatch(ci, id, _with_alpha(color, 0.12), size, t, 3.0)
 	_dispatch(ci, id, _with_alpha(color, 0.30), size, t, 1.8)
 	_dispatch(ci, id, color, size, t, 1.0)

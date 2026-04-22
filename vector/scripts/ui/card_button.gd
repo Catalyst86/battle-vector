@@ -121,12 +121,14 @@ func _draw() -> void:
 		# Empty id falls back to the generic primitive shape.
 		var icon_size: float = size.x * 0.24
 		var icon_center := Vector2(size.x * 0.5, size.y * 0.52)
-		draw_set_transform(icon_center, 0.0, Vector2.ONE)
 		if card.silhouette_id != &"" and Silhouettes.has(card.silhouette_id):
-			Silhouettes.draw(self, card.silhouette_id, card.color, icon_size, _t, 0.0)
+			# Silhouettes.draw sets its own transform — pass the card's
+			# icon centre as origin rather than pre-setting one here.
+			Silhouettes.draw(self, card.silhouette_id, card.color, icon_size, _t, 0.0, icon_center)
 		else:
+			draw_set_transform(icon_center, 0.0, Vector2.ONE)
 			ShapeRenderer.draw_with_glow(self, card.shape, card.color, icon_size, 0.0, 0.6)
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 		# Name at bottom.
 		var name_font: Font = Palette.FONT_DISPLAY_BOLD

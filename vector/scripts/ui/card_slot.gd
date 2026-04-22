@@ -14,11 +14,22 @@ signal upgraded(card: CardData)
 @onready var level_label: Label = $LevelLabel
 @onready var upgrade_btn: Button = $UpgradeButton
 
+## Drives the silhouette animation in the Collection view. Only advances
+## when the card actually has a registered silhouette — plain-shape cards
+## are static so we skip the per-frame redraw cost.
+var _t: float = 0.0
+
 func _ready() -> void:
 	custom_minimum_size = Vector2(82, 108)
 	upgrade_btn.pressed.connect(_on_upgrade_pressed)
 	PlayerProfile.changed.connect(_refresh)
+	set_process(true)
 	_refresh()
+
+func _process(delta: float) -> void:
+	if card != null and card.silhouette_id != &"":
+		_t += delta
+		queue_redraw()
 
 func _refresh() -> void:
 	if not is_inside_tree():
@@ -69,8 +80,13 @@ func _draw() -> void:
 	draw_rect(rect, Palette.CARD_BORDER, false, 1.0)
 	if card == null:
 		return
+	# Icon — route through Silhouettes when the card has one registered so
+	# the Collection matches the on-field piece. Empty id falls back.
 	var icon_size: float = 14.0
 	var icon_center := Vector2(size.x * 0.5, 28.0)
 	draw_set_transform(icon_center, 0.0, Vector2.ONE)
-	ShapeRenderer.draw(self, card.shape, card.color, icon_size, 0.0)
+	if card.silhouette_id != &"" and Silhouettes.has(card.silhouette_id):
+		Silhouettes.draw(self, card.silhouette_id, card.color, icon_size, _t, 0.0)
+	else:
+		ShapeRenderer.draw(self, card.shape, card.color, icon_size, 0.0)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

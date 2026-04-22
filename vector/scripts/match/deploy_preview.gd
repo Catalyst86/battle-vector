@@ -34,6 +34,11 @@ func _draw() -> void:
 	footprint.a = 0.22
 	draw_arc(Vector2.ZERO, card.size * 1.25, 0.0, TAU, 48, footprint, 1.0, true)
 	# The watermark shape itself — translucent outline of the card.
+	# Routes through Silhouettes when the card has one so the ghost
+	# matches what's about to spawn; static t=0 keeps the preview calm.
 	var ghost := card.color if affordable else Color(1, 0.4, 0.4)
 	ghost.a = 0.32 if affordable else 0.45
-	ShapeRenderer.draw_with_glow(self, card.shape, ghost, card.size, 0.0, 0.6)
+	if card.silhouette_id != &"" and Silhouettes.has(card.silhouette_id):
+		Silhouettes.draw(self, card.silhouette_id, ghost, card.size, 0.0, 0.0)
+	else:
+		ShapeRenderer.draw_with_glow(self, card.shape, ghost, card.size, 0.0, 0.6)

@@ -16,6 +16,10 @@ var is_selected: bool = false
 var is_dimmed: bool = false
 var cooldown_remaining: float = 0.0
 var cooldown_total: float = 0.0
+## Drives procedural animation for silhouette icons (wing flap, exhaust
+## pulse, etc.). Advances in _process only when the card has a registered
+## silhouette — plain-shape cards don't animate so we skip the redraw cost.
+var _t: float = 0.0
 
 @onready var role_label: Label = $RoleLabel
 @onready var name_label: Label = $NameLabel
@@ -29,6 +33,9 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if cooldown_remaining > 0.0:
 		cooldown_remaining = maxf(0.0, cooldown_remaining - delta)
+		queue_redraw()
+	elif card != null and card.silhouette_id != &"":
+		_t += delta
 		queue_redraw()
 
 ## Dim + block interaction for `seconds`. Visual cooldown overlay sweeps
@@ -109,10 +116,16 @@ func _draw() -> void:
 			Vector2(size.x * 0.5 - role_sz.x * 0.5, 12.0),
 			role_text, HORIZONTAL_ALIGNMENT_CENTER, -1, role_fs, card.color)
 
-		var icon_size: float = size.x * 0.24
+		# Icon — route through the Silhouettes library when the card has a
+		# registered silhouette so the hand matches the on-field piece.
+		# Empty id falls back to the generic primitive shape.
+		var icon_size: float = size.x * 0.28
 		var icon_center := Vector2(size.x * 0.5, size.y * 0.52)
 		draw_set_transform(icon_center, 0.0, Vector2.ONE)
-		ShapeRenderer.draw_with_glow(self, card.shape, card.color, icon_size, 0.0, 0.6)
+		if card.silhouette_id != &"" and Silhouettes.has(card.silhouette_id):
+			Silhouettes.draw(self, card.silhouette_id, card.color, icon_size, _t, 0.0)
+		else:
+			ShapeRenderer.draw_with_glow(self, card.shape, card.color, icon_size, 0.0, 0.6)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 		# Name at bottom.

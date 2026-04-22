@@ -67,6 +67,9 @@ var _playfield_base_pos: Vector2 = Vector2.ZERO
 # Per-match stat accumulators — flushed to DailyOps on _end_match. Only the
 # player's actions count; bot deploys don't tick player quests.
 var _stats_roles_played: Dictionary = {}
+# Telemetry counters — flushed to `user://matches.csv` in _end_match.
+var _telem_cards_played: int = 0
+var _telem_start_ticks_ms: int = 0
 var _stats_squares_destroyed: int = 0
 ## True while the tutorial briefing overlay is up — the BUILD countdown
 ## freezes so the player can read without the match auto-starting under them.
@@ -120,6 +123,7 @@ func _ready() -> void:
 	_update_coach()
 	_apply_tactical_hud()
 	MusicPlayer.play(&"match", 0.8)
+	_telem_start_ticks_ms = Time.get_ticks_msec()
 	if _mode != null and _mode.is_tutorial:
 		_show_tutorial_briefing()
 
@@ -573,6 +577,7 @@ func _try_deploy(screen: Vector2) -> void:
 	if _selected.cost > int(_mana):
 		return
 	_mana -= float(_selected.cost)
+	_telem_cards_played += 1
 	var deployed := _selected
 	SfxBank.play_event(deployed, &"deploy")
 	PlayerProfile.buzz(25)
@@ -796,6 +801,41 @@ func _end_match(result: String) -> void:
 		rewards.get("xp", 0),
 		rewards.get("levels", 0),
 	)
+	_log_telemetry(result, ending_phase)
+
+## Dump a match-end row to the telemetry CSV. Non-blocking, best-effort.
+func _log_telemetry(result: String, ending_phase: Phase) -> void:
+	if Telemetry == null:
+		return
+	var mode_str: String = "classic_tutorial" if (_mode != null and _mode.is_tutorial) else "classic_1v1"
+	if _mode != null and not _mode.is_tutorial and _mode.team_size >= 2:
+		mode_str = "classic_2v2"
+	var duration_s: float = (Time.get_ticks_msec() - _telem_start_ticks_ms) / 1000.0
+	var phase_str: String = "MATCH"
+	match ending_phase:
+		Phase.OVERTIME: phase_str = "OVERTIME"
+		Phase.SURGE:    phase_str = "SURGE"
+		Phase.BUILD:    phase_str = "BUILD"
+	var deck_ids: String = ""
+	for c in deck:
+		if c != null:
+			deck_ids += "%s;" % String(c.id)
+	Telemetry.log_match({
+		"mode": mode_str,
+		"team_size": (_mode.team_size if _mode != null else 1),
+		"result": result,
+		"duration_s": "%.1f" % duration_s,
+		"phase_at_end": phase_str,
+		"player_score": player_base.count_alive(),
+		"enemy_score": enemy_base.count_alive(),
+		"cards_played": _telem_cards_played,
+		"cards_linked": 0,  # classic has no Vector Link
+		"rift_captured_by": "none",  # classic has no rift
+		"player_arena_index": PlayerProfile.arena_index() if PlayerProfile != null else 0,
+		"player_level": PlayerProfile.data.player_level if PlayerProfile != null else 1,
+		"trophies_after": PlayerProfile.data.trophies if PlayerProfile != null else 0,
+		"deck_ids": deck_ids.trim_suffix(";"),
+	})
 	# Freeze the playfield behind the overlay. Units, projectiles, walls and
 	# bots all inherit the default pausable process mode; the overlay itself
 	# is PROCESS_MODE_ALWAYS (see GameOverOverlay._ready) so its buttons work.

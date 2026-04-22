@@ -116,6 +116,12 @@ var _link_recharge_t: float = 0.0
 var _link_mode: bool = false
 var _link_first: Node2D = null
 
+## Telemetry counters — flushed to user://matches.csv on _end_match.
+var _telem_cards_played: int = 0
+var _telem_cards_linked: int = 0
+var _telem_rift_captured_by: String = "none"
+var _telem_start_ticks_ms: int = 0
+
 func _ready() -> void:
 	add_to_group("match")
 	get_tree().paused = false
@@ -143,6 +149,7 @@ func _ready() -> void:
 	_refresh_hud()
 	SfxBank.play(&"match_start")
 	PlayerProfile.buzz(40)
+	_telem_start_ticks_ms = Time.get_ticks_msec()
 	_announce_synergies()
 
 ## Surface active deck synergies at match start — same pattern as classic
@@ -480,6 +487,7 @@ func _try_deploy(screen: Vector2) -> void:
 	if screen.x < 20.0 or screen.x > 340.0:
 		return
 	_mana -= float(_selected.cost)
+	_telem_cards_played += 1
 	var deployed := _selected
 	SfxBank.play_event(deployed, &"deploy")
 	PlayerProfile.buzz(25)
@@ -593,6 +601,10 @@ func _spawn_rift() -> void:
 func _on_rift_captured(capturing_is_enemy: bool) -> void:
 	_rift_boost_team_is_enemy = capturing_is_enemy
 	_rift_boost_remaining = RIFT_BOOST_SECONDS
+	# Telemetry: first-capture wins — if both sides eventually capture, we
+	# record the FIRST capture (the one that happened earliest).
+	if _telem_rift_captured_by == "none":
+		_telem_rift_captured_by = "enemy" if capturing_is_enemy else "player"
 	SfxBank.play(&"match_start", 0.12)
 	get_tree().call_group("match", "shake", 5.0)
 	if Toast != null:
@@ -629,6 +641,39 @@ func _end_match() -> void:
 		rewards.get("levels", 0),
 		"%d VS %d KILLS" % [_player_score, _enemy_score],
 	)
+	_log_telemetry(result)
+
+## Dump a match-end row to the telemetry CSV.
+func _log_telemetry(result: String) -> void:
+	if Telemetry == null:
+		return
+	var mode_str: String = "volley_2v2" if _team_size >= 2 else "volley_1v1"
+	var duration_s: float = (Time.get_ticks_msec() - _telem_start_ticks_ms) / 1000.0
+	var phase_str: String = "MATCH"
+	match phase:
+		Phase.OVERTIME: phase_str = "OVERTIME"
+		Phase.SURGE:    phase_str = "SURGE"
+		Phase.OVER:     phase_str = "OVERTIME" if _time_left > 0.0 else "MATCH"
+	var deck_ids: String = ""
+	for c in _deck:
+		if c != null:
+			deck_ids += "%s;" % String(c.id)
+	Telemetry.log_match({
+		"mode": mode_str,
+		"team_size": _team_size,
+		"result": result,
+		"duration_s": "%.1f" % duration_s,
+		"phase_at_end": phase_str,
+		"player_score": _player_score,
+		"enemy_score": _enemy_score,
+		"cards_played": _telem_cards_played,
+		"cards_linked": _telem_cards_linked,
+		"rift_captured_by": _telem_rift_captured_by,
+		"player_arena_index": PlayerProfile.arena_index() if PlayerProfile != null else 0,
+		"player_level": PlayerProfile.data.player_level if PlayerProfile != null else 1,
+		"trophies_after": PlayerProfile.data.trophies if PlayerProfile != null else 0,
+		"deck_ids": deck_ids.trim_suffix(";"),
+	})
 
 # ─── Vector Link ───────────────────────────────────────────────────────────
 
@@ -766,6 +811,7 @@ func _try_fuse(a: Node2D, b: Node2D) -> void:
 	# Spend the charge, reset the recharge timer, exit mode.
 	_link_charges -= 1
 	_link_recharge_t = 0.0
+	_telem_cards_linked += 1
 	_exit_link_mode()
 	if Toast != null:
 		Toast.notify("▸ %s" % fused_card.display_name.to_upper(), 1.6)

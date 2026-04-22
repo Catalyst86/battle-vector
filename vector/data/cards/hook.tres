@@ -15,6 +15,6 @@ cost = 3
 hp = 28.0
 damage = 10.0
 speed = 80.0
-attack_range = 35.0
+attack_range = 55.0
 fire_rate = 0.0
 size = 14.0

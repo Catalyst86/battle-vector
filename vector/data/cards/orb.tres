@@ -19,3 +19,4 @@ attack_range = 90.0
 fire_rate = 0.4
 size = 14.0
 swarm_count = 0
+pierces = true

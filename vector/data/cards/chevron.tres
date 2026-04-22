@@ -18,4 +18,4 @@ speed = 60.0
 attack_range = 70.0
 fire_rate = 0.5
 size = 16.0
-swarm_count = 3
+swarm_count = 4

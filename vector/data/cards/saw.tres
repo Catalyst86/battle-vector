@@ -18,3 +18,4 @@ speed = 25.0
 attack_range = 18.0
 fire_rate = 0.0
 size = 18.0
+melee_aoe_radius = 45.0

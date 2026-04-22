@@ -1,0 +1,16 @@
+{
+  "current_pass": 1,
+  "completed_passes": [0],
+  "cards_audited": [],
+  "simulations_run": [],
+  "contradictions_open": 0,
+  "last_updated": "2026-04-20",
+  "notes": "Pass 0 complete. Monte Carlo deferred across passes; static-only analysis with explicit flags. See METHODOLOGY.md for scope.",
+  "deferred_work": [
+    "Nash equilibrium on matchup matrix (Pass 3)",
+    "Elo gap P2W quantification (Pass 4)",
+    "Bot fuzz testing for exploit decks (Pass 6)",
+    "Variance / coin-flip detection (Pass 2/3)",
+    "Pre/post simulation for Pass 8 fixes"
+  ]
+}

@@ -35,6 +35,16 @@ const OT_MARGIN: int = 10  # overtime ends when a side leads by this many
 ## "nothing's happening yet" dead zone and encourages early deploys.
 const SURGE_SECONDS: float = 20.0
 const SURGE_MANA_REGEN_MULT: float = 2.0
+## Catch-up mana drip — trailing team's regen ramps up with their score
+## deficit, capped so even a blowout recovery stays inside a "meaningful
+## climb" band rather than a handout. Applied only during MATCH (not
+## SURGE / OVERTIME — those phases have their own economy).
+const CATCHUP_DEFICIT_CAP: int = 100
+const CATCHUP_MAX_BONUS: float = 0.5  # +50% regen at max deficit
+## Overtime Rift reward — capturing team gets their mana regen multiplied
+## for RIFT_BOOST_SECONDS, then the rift resets and can be captured again.
+const RIFT_BOOST_SECONDS: float = 12.0
+const RIFT_BOOST_REGEN_MULT: float = 2.0
 ## Field bounds — extended slightly to give squares more runway (descent
 ## distance drives how long the player has to react per spawn). Each side
 ## gets ~315 px instead of ~270.
@@ -79,6 +89,11 @@ var _deck: Array[CardData] = []
 var _selected: CardData = null
 var _mana: float = float(MANA_MAX)
 var _bots: Array[BotState] = []
+## Overtime rift instance — spawned at midline when OT begins, freed on
+## _end_match. Capture buffs get applied via _rift_boost_* below.
+var _rift: OvertimeRift = null
+var _rift_boost_team_is_enemy: bool = false
+var _rift_boost_remaining: float = 0.0
 
 func _ready() -> void:
 	add_to_group("match")
@@ -314,15 +329,44 @@ func _process(delta: float) -> void:
 	_update_shake(delta)
 	if phase == Phase.OVER:
 		return
-	# Mana regen — matches classic rate so deck-builders transfer feel.
-	# SURGE doubles the rate so the opening window is kinetic.
-	var regen_mult: float = SURGE_MANA_REGEN_MULT if phase == Phase.SURGE else 1.0
-	_mana = minf(_mana + MANA_REGEN_PER_SEC * delta * regen_mult, float(MANA_MAX))
+	# Base regen multiplier — SURGE doubles the rate so the opening window
+	# is kinetic; MATCH + OVERTIME run at normal rate modified by catch-up
+	# and rift-boost mechanics below.
+	var base_mult: float = SURGE_MANA_REGEN_MULT if phase == Phase.SURGE else 1.0
+	# Catch-up economy: trailing team's regen ramps up with their deficit.
+	# Active only during MATCH (not SURGE — the opening is already kinetic;
+	# not OVERTIME — the rift is the OT comeback mechanism).
+	var player_catchup: float = 0.0
+	var enemy_catchup: float = 0.0
+	if phase == Phase.MATCH:
+		var gap: int = absi(_player_score - _enemy_score)
+		var deficit_frac: float = clampf(float(gap) / float(CATCHUP_DEFICIT_CAP), 0.0, 1.0)
+		if _player_score < _enemy_score:
+			player_catchup = CATCHUP_MAX_BONUS * deficit_frac
+		elif _enemy_score < _player_score:
+			enemy_catchup = CATCHUP_MAX_BONUS * deficit_frac
+	# Rift-boost multiplier — expires naturally; rift resets on expiry so
+	# the capture cycle can fire again during the remaining OT window.
+	var player_rift: float = 0.0
+	var enemy_rift: float = 0.0
+	if _rift_boost_remaining > 0.0:
+		_rift_boost_remaining -= delta
+		if _rift_boost_team_is_enemy:
+			enemy_rift = RIFT_BOOST_REGEN_MULT - 1.0
+		else:
+			player_rift = RIFT_BOOST_REGEN_MULT - 1.0
+		if _rift_boost_remaining <= 0.0 and _rift != null and is_instance_valid(_rift):
+			_rift.reset()
+	var player_mult: float = base_mult + player_catchup + player_rift
+	var enemy_mult: float = base_mult + enemy_catchup + enemy_rift
+	_mana = minf(_mana + MANA_REGEN_PER_SEC * delta * player_mult, float(MANA_MAX))
 	# Bot economies + deploy ticks. Aggression shortens the spawn interval
-	# and boosts regen, matching classic 1V1 pacing.
+	# and boosts regen, matching classic 1V1 pacing. Enemy bots get the
+	# enemy multiplier; ally bot (is_enemy=false) gets the player's.
 	for b in _bots:
 		var aggro_mult: float = 0.7 + 0.6 * clampf(b.aggression, 0.0, 1.0)
-		b.mana = minf(b.mana + MANA_REGEN_PER_SEC * delta * aggro_mult * regen_mult, float(MANA_MAX))
+		var team_mult: float = enemy_mult if b.is_enemy else player_mult
+		b.mana = minf(b.mana + MANA_REGEN_PER_SEC * delta * aggro_mult * team_mult, float(MANA_MAX))
 		b.timer += delta
 		if b.timer >= BOT_SPAWN_INTERVAL / aggro_mult:
 			b.timer = 0.0
@@ -467,10 +511,35 @@ func _advance_phase() -> void:
 			_time_left = OVERTIME_SECONDS
 			phase_label.text = "OVERTIME"
 			phase_label.add_theme_color_override("font_color", Palette.UI_RED)
+			_spawn_rift()
 		else:
 			_end_match()
 	elif phase == Phase.OVERTIME:
 		_end_match()
+
+## Spawn the Overtime Rift at the midline and wire its capture signal.
+## The rift is the comeback lever: whoever's behind at the 2:00 mark
+## still has a direct mechanical path to swing the match.
+func _spawn_rift() -> void:
+	if _rift != null and is_instance_valid(_rift):
+		return
+	_rift = OvertimeRift.new()
+	field.add_child(_rift)
+	_rift.position = Vector2(180.0, MIDLINE_Y)
+	_rift.captured.connect(_on_rift_captured)
+	if Toast != null:
+		Toast.notify("▸ RIFT EXPOSED", 2.0)
+
+func _on_rift_captured(capturing_is_enemy: bool) -> void:
+	_rift_boost_team_is_enemy = capturing_is_enemy
+	_rift_boost_remaining = RIFT_BOOST_SECONDS
+	SfxBank.play(&"match_start", 0.12)
+	get_tree().call_group("match", "shake", 5.0)
+	if Toast != null:
+		var who: String = "ENEMY" if capturing_is_enemy else "YOU"
+		Toast.notify("▸ %s CAPTURED THE RIFT" % who, 2.2)
+	# Rift resets after the buff ends so the trailing side gets another
+	# shot — see the timer tick in _process.
 
 func _end_match() -> void:
 	if phase == Phase.OVER:

@@ -358,6 +358,13 @@ func _make_bot_from_persona(enemy: bool, persona: Dictionary) -> BotState:
 	b.aggression = float(persona.get("aggression", 0.75))
 	b.favour_roles = persona.get("favour_roles", [])
 	b.display_name = String(persona.get("name", "BOT"))
+	# Audit H3 — tier-1 warmup. New players (< 3 non-tutorial matches) get
+	# an easier enemy bot so the tutorial-to-ranked cliff doesn't bite.
+	# Ally bots in 2V2 keep persona aggression (they help the player).
+	if enemy and PlayerProfile != null and PlayerProfile.data != null:
+		var played: int = PlayerProfile.data.wins + PlayerProfile.data.losses + PlayerProfile.data.draws
+		if played < 3:
+			b.aggression = 0.4
 	return b
 
 func _process(delta: float) -> void:
@@ -376,8 +383,13 @@ func _process(delta: float) -> void:
 		return
 	var cfg := GameConfig.data
 	# SURGE multiplies mana regen for both player and bots — feels like the
-	# match is "hot" from second one rather than a slow ramp.
-	var regen_mult: float = cfg.surge_mana_regen_mult if phase == Phase.SURGE else 1.0
+	# match is "hot" from second one rather than a slow ramp. OVERTIME
+	# doubles too (audit H2) so the comeback window has real pressure.
+	var regen_mult: float = 1.0
+	if phase == Phase.SURGE:
+		regen_mult = cfg.surge_mana_regen_mult
+	elif phase == Phase.OVERTIME:
+		regen_mult = 2.0
 	_mana = minf(_mana + cfg.mana_regen_per_sec * delta * regen_mult, float(cfg.mana_max))
 	for b in _bots:
 		# Aggressive personas regenerate + act faster. Multiplier range 0.7–1.3.
@@ -848,10 +860,21 @@ func _bot_try_spawn(b: BotState) -> void:
 		return
 	var cfg := GameConfig.data
 	var affordable: Array[CardData] = []
+	var heavy_cost: int = 0
 	for c in b.deck_cards:
-		if c != null and c.cost <= int(b.mana):
+		if c == null:
+			continue
+		if c.cost <= int(b.mana):
 			affordable.append(c)
+		if c.cost >= 6 and c.cost > heavy_cost:
+			heavy_cost = c.cost
 	if affordable.is_empty():
+		return
+	# Audit M2 — bot occasionally saves mana for a heavy play instead of
+	# spamming cheap units. 30% skip when under the heavy threshold. Makes
+	# openings feel less predictable; at higher aggression the bot still
+	# spawns often enough that saving doesn't cripple pressure.
+	if heavy_cost > 0 and int(b.mana) < heavy_cost and randf() < 0.30:
 		return
 	# Prefer cards whose role isn't in recent history, AND lean toward the
 	# persona's favoured roles. Fresh-role set filters by "haven't used in

@@ -253,6 +253,12 @@ func _make_bot_from_persona(enemy: bool, persona: Dictionary) -> BotState:
 	b.aggression = float(persona.get("aggression", 0.75))
 	b.favour_roles = persona.get("favour_roles", [])
 	b.display_name = String(persona.get("name", "BOT"))
+	# Audit H3 — tier-1 warmup for new players. Applies only to enemy bots
+	# so 2V2 ally bots still play at persona pace.
+	if enemy and PlayerProfile != null and PlayerProfile.data != null:
+		var played: int = PlayerProfile.data.wins + PlayerProfile.data.losses + PlayerProfile.data.draws
+		if played < 3:
+			b.aggression = 0.4
 	return b
 
 ## Bot deploy tick. Picks an affordable card, biases toward recent-role
@@ -261,10 +267,18 @@ func _bot_try_spawn(b: BotState) -> void:
 	if b.deck_cards.is_empty() or phase == Phase.OVER:
 		return
 	var affordable: Array[CardData] = []
+	var heavy_cost: int = 0
 	for c in b.deck_cards:
-		if c != null and c.cost <= int(b.mana):
+		if c == null:
+			continue
+		if c.cost <= int(b.mana):
 			affordable.append(c)
+		if c.cost >= 6 and c.cost > heavy_cost:
+			heavy_cost = c.cost
 	if affordable.is_empty():
+		return
+	# Audit M2 — occasional save for a heavy play instead of cheap spam.
+	if heavy_cost > 0 and int(b.mana) < heavy_cost and randf() < 0.30:
 		return
 	var fresh: Array[CardData] = []
 	for c in affordable:

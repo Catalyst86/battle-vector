@@ -243,6 +243,7 @@ func _build_deck_chip(c: CardData) -> Control:
 	var icon := ShapeIcon.new()
 	icon.shape = c.shape
 	icon.color = c.color
+	icon.silhouette_id = c.silhouette_id
 	icon.icon_size = 10.0
 	icon.custom_minimum_size = Vector2(0, 28)
 	vb.add_child(icon)

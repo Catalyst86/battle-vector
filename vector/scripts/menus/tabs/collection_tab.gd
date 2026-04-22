@@ -253,6 +253,7 @@ func _build_card_tile(c: CardData) -> Control:
 	var icon := ShapeIcon.new()
 	icon.shape = c.shape
 	icon.color = c.color if unlocked else Palette.UI_TEXT_3
+	icon.silhouette_id = c.silhouette_id
 	icon.icon_size = 22.0
 	icon.set_anchors_preset(Control.PRESET_CENTER)
 	icon.offset_left = -22; icon.offset_top = -22
@@ -346,6 +347,7 @@ func _build_upgrade_banner() -> Control:
 		var icon := ShapeIcon.new()
 		icon.shape = c.shape
 		icon.color = c.color
+		icon.silhouette_id = c.silhouette_id
 		icon.icon_size = 14.0
 		icon.custom_minimum_size = Vector2(28, 28)
 		row.add_child(icon)

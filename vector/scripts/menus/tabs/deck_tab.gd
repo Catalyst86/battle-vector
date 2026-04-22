@@ -124,6 +124,7 @@ func _build_deck_tile(c: CardData, idx: int) -> Control:
 	var icon := ShapeIcon.new()
 	icon.shape = c.shape
 	icon.color = c.color
+	icon.silhouette_id = c.silhouette_id
 	icon.icon_size = 18.0
 	icon.custom_minimum_size = Vector2(0, 34)
 	icon.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -172,6 +173,7 @@ func _rebuild_detail() -> void:
 	var icon := ShapeIcon.new()
 	icon.shape = c.shape
 	icon.color = c.color
+	icon.silhouette_id = c.silhouette_id
 	icon.icon_size = 22.0
 	gp.add_child(icon)
 	row.add_child(gp)
@@ -298,10 +300,10 @@ func _rebuild_synergy() -> void:
 		var card_a: CardData = _find_card(pair.a)
 		var card_b: CardData = _find_card(pair.b)
 		if card_a and card_b:
-			var ia := ShapeIcon.new(); ia.shape = card_a.shape; ia.color = card_a.color; ia.icon_size = 9.0; ia.custom_minimum_size = Vector2(18, 18)
+			var ia := ShapeIcon.new(); ia.shape = card_a.shape; ia.color = card_a.color; ia.silhouette_id = card_a.silhouette_id; ia.icon_size = 9.0; ia.custom_minimum_size = Vector2(18, 18)
 			row.add_child(ia)
 			row.add_child(TabHelpers.mono("+", 10, Palette.UI_TEXT_3))
-			var ib := ShapeIcon.new(); ib.shape = card_b.shape; ib.color = card_b.color; ib.icon_size = 9.0; ib.custom_minimum_size = Vector2(18, 18)
+			var ib := ShapeIcon.new(); ib.shape = card_b.shape; ib.color = card_b.color; ib.silhouette_id = card_b.silhouette_id; ib.icon_size = 9.0; ib.custom_minimum_size = Vector2(18, 18)
 			row.add_child(ib)
 		var bonus_pct: int = int(round(float(pair.bonus) * 100.0))
 		row.add_child(TabHelpers.mono("%s +%d%%" % [String(pair.label), bonus_pct], 10, Palette.UI_TEXT_1))
@@ -607,6 +609,7 @@ func _detail_glyph(card: CardData) -> Control:
 	var icon := ShapeIcon.new()
 	icon.shape = card.shape
 	icon.color = card.color
+	icon.silhouette_id = card.silhouette_id
 	icon.icon_size = 42.0
 	icon.glow = true
 	panel.add_child(icon)
@@ -677,6 +680,7 @@ func _detail_synergies(card: CardData) -> Control:
 			var partner_icon := ShapeIcon.new()
 			partner_icon.shape = partner.shape
 			partner_icon.color = partner.color
+			partner_icon.silhouette_id = partner.silhouette_id
 			partner_icon.icon_size = 9.0
 			partner_icon.custom_minimum_size = Vector2(20, 20)
 			row.add_child(partner_icon)

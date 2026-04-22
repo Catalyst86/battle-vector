@@ -5,7 +5,10 @@ extends Node
 const PROFILE_PATH := "user://profile.tres"
 
 ## Upgrade costs, index 0 = cost to go from L1 → L2, etc.
-const UPGRADE_COSTS: Array[int] = [20, 50, 100, 200, 400, 800, 1500, 3000, 6000]
+## Audit-raised 1.5× from the original (20/50/100/200/400/800/1500/3000/6000)
+## to pull days-to-max-1-card from ~25 toward the 60-120 benchmark floor.
+## Total L1→L10 cost: 18,105 gold.
+const UPGRADE_COSTS: Array[int] = [30, 75, 150, 300, 600, 1200, 2250, 4500, 9000]
 
 ## Arena trophy thresholds (index = arena level).
 const ARENA_THRESHOLDS: Array[int] = [0, 100, 300, 600, 1000, 1500, 2200, 3000]
@@ -149,10 +152,14 @@ func award_match_result(result: String) -> Dictionary:
 # --- Player XP / level ------------------------------------------------------
 
 ## XP required to go from level `lvl` → `lvl+1`. Quadratic ramp.
+## Audit pulled coefficient from 80 → 40 (halved) so matches-to-max-level
+## moves from ~2550 toward the 300-500 benchmark. Now: ~1275 matches at
+## median XP rate — still above the ceiling but within 2.5× rather than 5×.
+## If this feels too fast in playtest, raise coefficient toward 60.
 func xp_to_next(lvl: int) -> int:
 	if lvl >= data.max_player_level:
 		return -1
-	return 80 * lvl * lvl + 120
+	return 40 * lvl * lvl + 120
 
 func xp_progress_frac() -> float:
 	var needed := xp_to_next(data.player_level)

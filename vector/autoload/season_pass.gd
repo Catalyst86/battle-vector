@@ -8,7 +8,10 @@ signal changed
 const SEASON_NAME: String = "VECTOR.INIT"
 const SEASON_NUMBER: int = 1
 const MAX_TIER: int = 30
-const XP_PER_TIER: int = 200
+## Audit raised from 200 → 400 to compensate for the halved player-XP
+## curve (player_profile.xp_to_next coefficient 80 → 40). Without this
+## adjustment the season pass would fill in half the intended time.
+const XP_PER_TIER: int = 400
 ## Unix timestamp the season ends — hard-coded 30 days from the project's
 ## reference date. Replace when you roll a real season schedule.
 const SEASON_END_UNIX: int = 1776614400   # 2026-04-19 + 30d at 00:00 UTC (approx)

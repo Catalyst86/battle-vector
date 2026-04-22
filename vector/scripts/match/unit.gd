@@ -34,6 +34,15 @@ var _flash: float = 0.0
 ## effective damage to the gun and self-destructs. Set by match_volley.gd
 ## immediately after spawn.
 var _volley_gun_target: Node2D = null
+## Multiplier on movement speed — defaulted to 1.0 (classic behaviour). The
+## Volley controller drops this to ~0.85 so everyone walks a little less
+## frantically, giving the player time to read the field and pick link
+## targets. Not baked into card.speed so classic balance is untouched.
+var speed_mult: float = 1.0
+## When true, this unit is the first half of a pending Vector Link and a
+## pulsing amber ring is drawn around it so the player can see which
+## unit they picked. Cleared by match_volley on link completion / cancel.
+var link_highlight: bool = false
 
 func _ready() -> void:
 	assert(card != null, "Unit.card not assigned")
@@ -290,13 +299,13 @@ func _move_toward(target: Vector2, delta: float) -> void:
 	var dir: Vector2 = target - world_pos
 	if dir.length() < 0.001:
 		return
-	world_pos += dir.normalized() * card.speed * delta
+	world_pos += dir.normalized() * card.speed * speed_mult * delta
 
 func _move_toward_base(delta: float) -> void:
 	if card.speed <= 0.0:
 		return
 	var dir_y: float = -1.0 if not is_enemy else 1.0
-	world_pos.y += card.speed * dir_y * delta
+	world_pos.y += card.speed * speed_mult * dir_y * delta
 
 func _try_fire(target_world: Vector2) -> void:
 	if card.fire_rate <= 0.0:
@@ -315,11 +324,17 @@ func _spawn_projectiles(target: Vector2) -> void:
 		base_dir = Vector2(0.0, -1.0 if not is_enemy else 1.0)
 	var spread_rad: float = deg_to_rad(card.projectile_spread_deg)
 	var start_angle: float = -spread_rad * float(count - 1) * 0.5
+	# Volley projectiles travel slightly slower than classic's — same
+	# "slower playfield" pass that drops unit speed_mult, so bolts don't
+	# snap across the field in one frame.
+	var proj_speed: float = cfg.projectile_speed
+	if _volley_gun_target != null:
+		proj_speed *= 0.8
 	for i in count:
 		var dir: Vector2 = base_dir.rotated(start_angle + spread_rad * i)
 		var p: Projectile = SpawnPool.acquire_projectile(get_parent()) as Projectile
 		p.world_pos = world_pos
-		p.velocity = dir * cfg.projectile_speed
+		p.velocity = dir * proj_speed
 		p.damage = effective_damage
 		p.color = card.color
 		p.owner_enemy = is_enemy
@@ -517,3 +532,11 @@ func _draw() -> void:
 		var y_off: float = card.size + 6.0
 		draw_rect(Rect2(-w * 0.5, y_off, w, h), Color(0, 0, 0, 0.5), true)
 		draw_rect(Rect2(-w * 0.5, y_off, w * pct, h), card.color, true)
+	# Vector Link selection halo — pulsing amber ring confirms the first
+	# unit picked during link mode. Same amber as the LINK button so the
+	# visual language matches.
+	if link_highlight:
+		var pulse: float = 0.5 + 0.5 * sin(_age * 8.0)
+		var ring := Palette.UI_AMBER
+		ring.a = 0.35 + 0.45 * pulse
+		draw_arc(Vector2.ZERO, card.size * 1.55, 0.0, TAU, 48, ring, 1.8 + 1.2 * pulse, true)

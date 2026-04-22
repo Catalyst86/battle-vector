@@ -171,7 +171,9 @@ func _fire(sq: Square) -> void:
 	p.damage = _damage
 	get_parent().add_child(p)
 	p.global_position = global_position + Vector2.from_angle(_aim_angle) * 12.0
-	p.velocity = Vector2.from_angle(_aim_angle) * 620.0
+	# Slower bolt speed — same pacing pass as unit.gd's volley projectile
+	# slowdown. 520 gives squares enough travel time to be reactable.
+	p.velocity = Vector2.from_angle(_aim_angle) * 520.0
 
 # ─── Rendering ─────────────────────────────────────────────────────────────
 

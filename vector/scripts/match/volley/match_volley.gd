@@ -54,7 +54,7 @@ const LINK_RECHARGE_SECONDS: float = 25.0
 const LINK_HP_FACTOR: float = 0.85    # (A.hp + B.hp) × this
 const LINK_DAMAGE_FACTOR: float = 1.6  # (A.dmg + B.dmg) × this
 const LINK_SIZE_FACTOR: float = 1.20   # larger sprite for the fused unit
-const LINK_SELECT_RADIUS: float = 44.0 # tap-to-select hitbox on the field
+const LINK_SELECT_RADIUS: float = 70.0 # generous tap-to-select hitbox; towers are stationary and small, need room
 ## Field bounds — extended slightly to give squares more runway (descent
 ## distance drives how long the player has to react per spawn). Each side
 ## gets ~315 px instead of ~270.
@@ -64,7 +64,11 @@ const MIDLINE_Y: float = 390.0
 ## Square base descent speed override — slower than the Square default so
 ## the board doesn't fill up. Combined with the longer field, squares spend
 ## ~30% more time on screen per spawn.
-const SQUARE_BASE_SPEED: float = 55.0
+const SQUARE_BASE_SPEED: float = 46.0
+## All player/bot units get their card.speed multiplied by this in Volley,
+## so the lane feels readable. Doesn't touch CardData so classic balance
+## is preserved.
+const VOLLEY_UNIT_SPEED_MULT: float = 0.85
 ## Mana economy — matches classic 1V1 defaults. Tuned later if needed.
 const MANA_MAX: int = 10
 const MANA_START: float = 6.0
@@ -73,7 +77,7 @@ const MANA_REGEN_PER_SEC: float = 1.0
 const DEPLOY_COOLDOWN: float = 0.4
 ## Seconds between bot spawn attempts. Aggression multiplier shortens this
 ## per-bot so high-arena opponents flood the board faster.
-const BOT_SPAWN_INTERVAL: float = 2.5
+const BOT_SPAWN_INTERVAL: float = 2.8
 
 class BotState:
 	var deck_cards: Array[CardData] = []
@@ -507,6 +511,7 @@ func _spawn_single(c: CardData, at_world: Vector2, enemy: bool) -> void:
 	# ignoring walls and BaseGrid arrival. Picked closest so 2V2 deploys
 	# near one gun prefer it over the diagonally-opposite one.
 	u._volley_gun_target = _pick_target_gun(at_world, enemy)
+	u.speed_mult = VOLLEY_UNIT_SPEED_MULT
 
 ## Closest living gun on the opposite side. Returns null only if every
 ## gun on that side has already been destroyed — rare, guarded downstream.
@@ -656,6 +661,8 @@ func _on_link_button_pressed() -> void:
 
 func _exit_link_mode() -> void:
 	_link_mode = false
+	if _link_first != null and is_instance_valid(_link_first):
+		_link_first.link_highlight = false
 	_link_first = null
 	_update_link_button()
 	_update_hint()
@@ -668,6 +675,7 @@ func _handle_link_tap(screen: Vector2) -> void:
 		return
 	if _link_first == null:
 		_link_first = unit
+		unit.link_highlight = true
 		hint_label.text = "▸ TAP SECOND UNIT"
 		return
 	if unit == _link_first:

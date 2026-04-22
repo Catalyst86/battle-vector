@@ -536,7 +536,7 @@ func _draw() -> void:
 	# unit picked during link mode. Same amber as the LINK button so the
 	# visual language matches.
 	if link_highlight:
-		var pulse: float = 0.5 + 0.5 * sin(_age * 8.0)
-		var ring := Palette.UI_AMBER
-		ring.a = 0.35 + 0.45 * pulse
-		draw_arc(Vector2.ZERO, card.size * 1.55, 0.0, TAU, 48, ring, 1.8 + 1.2 * pulse, true)
+		var link_pulse: float = 0.5 + 0.5 * sin(_age * 8.0)
+		var link_ring := Palette.UI_AMBER
+		link_ring.a = 0.35 + 0.45 * link_pulse
+		draw_arc(Vector2.ZERO, card.size * 1.55, 0.0, TAU, 48, link_ring, 1.8 + 1.2 * link_pulse, true)

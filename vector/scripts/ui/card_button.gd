@@ -119,7 +119,7 @@ func _draw() -> void:
 		# Icon — route through the Silhouettes library when the card has a
 		# registered silhouette so the hand matches the on-field piece.
 		# Empty id falls back to the generic primitive shape.
-		var icon_size: float = size.x * 0.28
+		var icon_size: float = size.x * 0.24
 		var icon_center := Vector2(size.x * 0.5, size.y * 0.52)
 		draw_set_transform(icon_center, 0.0, Vector2.ONE)
 		if card.silhouette_id != &"" and Silhouettes.has(card.silhouette_id):

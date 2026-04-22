@@ -37,8 +37,14 @@ extends RefCounted
 ## The dispatcher calls the silhouette three times — halo → mid → core —
 ## with widening strokes and lower alpha, same pattern as
 ## `ShapeRenderer.draw_with_glow`. Individual silhouettes accept a
-## `stroke_mult` param and scale their line widths accordingly so the
-## bloom is automatic.
+## `stroke_mult` param and scale their **line widths** accordingly so
+## the bloom is automatic.
+##
+## Filled circles (draw_circle) use **size-proportional** radii, NOT
+## stroke-proportional — a stroke multiplier widens a line's thickness,
+## but multiplying a filled dot's radius by 3 makes a 2 px spark bloom
+## into a 6 px disc that overflows the icon container. Keep circle
+## radii tied to `size`.
 
 ## Canonical list of registered silhouette ids — `has()` checks against
 ## this and `_dispatch()` matches on it. Add to this array when you land a
@@ -120,15 +126,14 @@ static func _draw_dart(ci: CanvasItem, color: Color, size: float, t: float, sw: 
 	ci.draw_line(Vector2(0, size * 0.50), Vector2(-size * 0.20, size * 0.70), color, 1.2 * sw, true)
 	ci.draw_line(Vector2(0, size * 0.50), Vector2( size * 0.20, size * 0.70), color, 1.2 * sw, true)
 
-	# Afterburner — pulsing core + halo circle behind the tail. The halo
-	# extends slightly past the fuselage tip so the jet feels like it's
-	# leaving exhaust behind it, not dragging it.
+	# Afterburner — pulsing core + halo dot behind the tail. Positions +
+	# radii size-proportional so the full bloom stays within ±size.
 	var flare := color
 	flare.a = color.a * burn
-	ci.draw_circle(Vector2(0, size * 0.88), 2.4 * sw, flare)
+	ci.draw_circle(Vector2(0, size * 0.72), size * 0.11, flare)
 	var halo := color
 	halo.a = color.a * burn * 0.35
-	ci.draw_circle(Vector2(0, size * 0.94), 4.2 * sw, halo)
+	ci.draw_circle(Vector2(0, size * 0.78), size * 0.20, halo)
 
 ## BOMB — warhead rocket. Tapered nose, body with a midsection seam band,
 ## tail fins, flickering exhaust flame. Biggest default-deck piece (size
@@ -168,10 +173,12 @@ static func _draw_bomb(ci: CanvasItem, color: Color, size: float, t: float, sw: 
 	ci.draw_line(Vector2( w, size * 0.35),       Vector2( w * 1.9, size * 0.62), color, 1.2 * sw, true)
 	ci.draw_line(Vector2( w * 1.9, size * 0.62), Vector2( w,       size * 0.62), color, 1.2 * sw, true)
 
-	# Flame — flickering triangle below the fins, pulsing alpha.
+	# Flame — flickering triangle below the fins, pulsing alpha. Cap the
+	# flame tip so a fast flicker frame can't poke past the bottom of the
+	# container. Halo radius/position size-proportional.
 	var flame_c := color
 	flame_c.a = color.a * flame
-	var flame_tip: float = size * (0.88 + 0.08 * sin(t * 26.0))
+	var flame_tip: float = size * (0.82 + 0.06 * sin(t * 26.0))
 	var flame_pts: PackedVector2Array = PackedVector2Array([
 		Vector2(-w * 0.7, size * 0.62),
 		Vector2( 0,        flame_tip),
@@ -180,7 +187,7 @@ static func _draw_bomb(ci: CanvasItem, color: Color, size: float, t: float, sw: 
 	ci.draw_polyline(flame_pts, flame_c, 1.4 * sw, true)
 	var flame_halo := color
 	flame_halo.a = color.a * flame * 0.3
-	ci.draw_circle(Vector2(0, size * 0.78), 3.2 * sw, flame_halo)
+	ci.draw_circle(Vector2(0, size * 0.72), size * 0.20, flame_halo)
 
 ## SPIRAL — drill. Vertical cone with helical stripes that scroll along
 ## the body, fake-rotation from 2D. Tip spark reads as friction sparks on
@@ -215,10 +222,11 @@ static func _draw_spiral(ci: CanvasItem, color: Color, size: float, t: float, sw
 		Vector2( size * 0.55, size * 0.6),
 		color, 1.2 * sw, true)
 
-	# Tip sparks — flashing dot.
+	# Tip sparks — flashing dot. Radius size-proportional, pulled in from
+	# the cone tip a touch so the bloom edge stays inside ±size.
 	var spark := color
 	spark.a = color.a * (0.3 + 0.5 * abs(sin(t * 13.0)))
-	ci.draw_circle(Vector2(0, -size * 0.93), 1.4 * sw, spark)
+	ci.draw_circle(Vector2(0, -size * 0.85), size * 0.09, spark)
 
 ## BURST — lean chaser. Spearhead body, twin side thrusters with pulsing
 ## flare tails. Shorter nose than the dart so it reads "aggressor" rather
@@ -241,13 +249,13 @@ static func _draw_burst(ci: CanvasItem, color: Color, size: float, t: float, sw:
 	ci.draw_line(Vector2( size * 0.5, -size * 0.05), Vector2( size * 0.5, size * 0.3), color, 1.2 * sw, true)
 
 	# Core dot.
-	ci.draw_circle(Vector2(0, -size * 0.2), 1.1 * sw, color)
+	ci.draw_circle(Vector2(0, -size * 0.2), size * 0.08, color)
 
-	# Thruster flares — pulsing dots trailing each thruster.
+	# Thruster flares — pulsing dots trailing each thruster, proportional.
 	var flare := color
 	flare.a = color.a * boost
-	ci.draw_circle(Vector2(-size * 0.5, size * 0.45), 1.8 * sw, flare)
-	ci.draw_circle(Vector2( size * 0.5, size * 0.45), 1.8 * sw, flare)
+	ci.draw_circle(Vector2(-size * 0.5, size * 0.42), size * 0.12, flare)
+	ci.draw_circle(Vector2( size * 0.5, size * 0.42), size * 0.12, flare)
 
 ## LANCE — stationary rail-gun tower. Wide base, support column, long
 ## barrel, two rail coils, charge glow at the muzzle. The silhouette
@@ -273,13 +281,14 @@ static func _draw_lance(ci: CanvasItem, color: Color, size: float, t: float, sw:
 	ci.draw_line(Vector2(-size * 0.16, -size * 0.25), Vector2(size * 0.16, -size * 0.25), coil, 0.8 * sw, true)
 	ci.draw_line(Vector2(-size * 0.16, -size * 0.55), Vector2(size * 0.16, -size * 0.55), coil, 0.8 * sw, true)
 
-	# Muzzle charge glow — core + halo.
+	# Muzzle charge glow — core + halo, pulled in from barrel tip so the
+	# halo edge doesn't overshoot ±size.
 	var tip := color
 	tip.a = color.a * charge
-	ci.draw_circle(Vector2(0, -size * 0.95), 1.8 * sw, tip)
+	ci.draw_circle(Vector2(0, -size * 0.80), size * 0.12, tip)
 	var halo := color
 	halo.a = color.a * charge * 0.4
-	ci.draw_circle(Vector2(0, -size * 0.95), 3.6 * sw, halo)
+	ci.draw_circle(Vector2(0, -size * 0.76), size * 0.22, halo)
 
 ## ORB — orbital satellite. Central body with two half-ring arcs whose Y
 ## scales oscillate out of phase — fakes 3D rotation from 2D primitives.
@@ -338,10 +347,11 @@ static func _draw_scout(ci: CanvasItem, color: Color, size: float, t: float, sw:
 	# Short fuselage — spine from cockpit to tail.
 	ci.draw_line(Vector2(0, -size * 0.5), Vector2(0, size * 0.45), color, 1.2 * sw, true)
 
-	# Tail thruster — pulsing dot.
+	# Tail thruster — pulsing dot, proportional to size so the bloom
+	# stays inside the scout's ±size bounding.
 	var flare := color
 	flare.a = color.a * burn
-	ci.draw_circle(Vector2(0, size * 0.6), 1.5 * sw, flare)
+	ci.draw_circle(Vector2(0, size * 0.55), size * 0.11, flare)
 
 ## PULSE — shockwave hunter. Diamond body with an inner diamond detail,
 ## plus an expanding ring that cycles outward (telegraphs the on-death
@@ -373,12 +383,14 @@ static func _draw_pulse(ci: CanvasItem, color: Color, size: float, t: float, sw:
 	ci.draw_polyline(inner, color, 0.8 * sw, true)
 
 	# Expanding shockwave ring — radius grows with phase, alpha fades out.
+	# Capped at 0.90×size (was 1.20×size) so the ring stays inside the
+	# icon container even at full expansion.
 	var ring := color
 	ring.a = color.a * expand_fade * 0.55
-	ci.draw_arc(Vector2.ZERO, size * (0.55 + phase * 0.65), 0.0, TAU, 36, ring, 1.0 * sw, true)
+	ci.draw_arc(Vector2.ZERO, size * (0.50 + phase * 0.40), 0.0, TAU, 36, ring, 1.0 * sw, true)
 
-	# Twin thruster flares at the rear.
+	# Twin thruster flares at the rear. Size-proportional radii.
 	var flare := color
 	flare.a = color.a * thrust
-	ci.draw_circle(Vector2(-size * 0.28, size * 0.62), 1.5 * sw, flare)
-	ci.draw_circle(Vector2( size * 0.28, size * 0.62), 1.5 * sw, flare)
+	ci.draw_circle(Vector2(-size * 0.28, size * 0.55), size * 0.10, flare)
+	ci.draw_circle(Vector2( size * 0.28, size * 0.55), size * 0.10, flare)

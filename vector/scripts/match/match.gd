@@ -4,7 +4,7 @@ extends Node2D
 ## 2v2 spawns an ally bot on your side + two enemy bots on theirs. When
 ## networking lands, the bots are replaced by remote peers.
 
-enum Phase { BUILD, MATCH, OVERTIME, OVER }
+enum Phase { BUILD, SURGE, MATCH, OVERTIME, OVER }
 
 @export var deck: Array[CardData] = []
 ## Seconds between bot spawn attempts during MATCH/OVERTIME.
@@ -371,11 +371,14 @@ func _process(delta: float) -> void:
 		_refresh_ui()
 		return
 	var cfg := GameConfig.data
-	_mana = minf(_mana + cfg.mana_regen_per_sec * delta, float(cfg.mana_max))
+	# SURGE multiplies mana regen for both player and bots — feels like the
+	# match is "hot" from second one rather than a slow ramp.
+	var regen_mult: float = cfg.surge_mana_regen_mult if phase == Phase.SURGE else 1.0
+	_mana = minf(_mana + cfg.mana_regen_per_sec * delta * regen_mult, float(cfg.mana_max))
 	for b in _bots:
 		# Aggressive personas regenerate + act faster. Multiplier range 0.7–1.3.
 		var aggro_mult: float = 0.7 + 0.6 * clampf(b.aggression, 0.0, 1.0)
-		b.mana = minf(b.mana + cfg.mana_regen_per_sec * delta * aggro_mult, float(cfg.mana_max))
+		b.mana = minf(b.mana + cfg.mana_regen_per_sec * delta * aggro_mult * regen_mult, float(cfg.mana_max))
 		b.timer += delta
 		if b.timer >= bot_spawn_interval / aggro_mult:
 			b.timer = 0.0
@@ -446,7 +449,25 @@ func _start_match() -> void:
 		return
 	SfxBank.play(&"match_start")
 	PlayerProfile.buzz(45)
-	phase = Phase.MATCH
+	var cfg := GameConfig.data
+	# Enter SURGE if configured — full mana + boosted regen for the opening
+	# window so the player can punch aggressively right out of BUILD. If
+	# surge_seconds is 0 we skip straight to MATCH for designer flexibility.
+	if cfg.surge_seconds > 0.0:
+		phase = Phase.SURGE
+		_time_left = cfg.surge_seconds
+		_mana = float(cfg.mana_max)
+		for b in _bots:
+			b.mana = float(cfg.mana_max)
+		phase_label.text = "SURGE"
+		phase_label.add_theme_color_override("font_color", Palette.UI_AMBER)
+		if mana_bar is ManaBar:
+			(mana_bar as ManaBar).pip_color = Palette.UI_AMBER
+			mana_bar.queue_redraw()
+	else:
+		phase = Phase.MATCH
+		_time_left = float(cfg.match_seconds)
+		phase_label.text = "MATCH"
 	_wall_mode = false
 	# Every bot gets its own 3-wall allotment auto-placed on the correct side.
 	for b in _bots:
@@ -454,7 +475,6 @@ func _start_match() -> void:
 	wall_toggle.visible = false
 	start_btn.visible = false
 	hand.set_interactive(true)
-	phase_label.text = "MATCH"
 	_refresh_ui()
 	_update_hint()
 	_update_coach()
@@ -696,7 +716,17 @@ func _check_win() -> void:
 
 func _advance_phase() -> void:
 	var cfg := GameConfig.data
-	if phase == Phase.MATCH:
+	if phase == Phase.SURGE:
+		# Surge ended — enter MATCH with the remaining share of match_seconds
+		# so total in-match time stays balanced (25s SURGE + 155s MATCH = 180s).
+		phase = Phase.MATCH
+		_time_left = maxf(0.0, float(cfg.match_seconds) - cfg.surge_seconds)
+		phase_label.text = "MATCH"
+		phase_label.add_theme_color_override("font_color", Palette.UI_CYAN)
+		if mana_bar is ManaBar:
+			(mana_bar as ManaBar).pip_color = Palette.UI_CYAN
+			mana_bar.queue_redraw()
+	elif phase == Phase.MATCH:
 		phase = Phase.OVERTIME
 		_time_left = float(cfg.overtime_seconds)
 		phase_label.text = "OVERTIME"
@@ -829,7 +859,7 @@ func _on_card_selected(card: CardData) -> void:
 	_update_coach()
 
 func _update_preview(screen: Vector2) -> void:
-	if phase != Phase.MATCH and phase != Phase.OVERTIME:
+	if phase != Phase.SURGE and phase != Phase.MATCH and phase != Phase.OVERTIME:
 		preview.hide_preview()
 		return
 	if _selected == null:

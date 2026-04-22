@@ -4,7 +4,7 @@ extends Node2D
 ## match_confirm, game_over) — just the in-match phase is specific to this
 ## mode.
 
-enum Phase { MATCH, OVERTIME, OVER }
+enum Phase { SURGE, MATCH, OVERTIME, OVER }
 
 const SQUARE_SCENE: PackedScene = preload("res://scenes/match/volley/square.tscn")
 const GUN_SCENE: PackedScene = preload("res://scenes/match/volley/gun.tscn")
@@ -31,6 +31,10 @@ const SCOUT_CARD: CardData = preload("res://data/cards/_scout.tres")
 const MATCH_SECONDS: float = 120.0
 const OVERTIME_SECONDS: float = 60.0
 const OT_MARGIN: int = 10  # overtime ends when a side leads by this many
+## Opening sub-phase — enters with full mana + doubled regen. Cuts the
+## "nothing's happening yet" dead zone and encourages early deploys.
+const SURGE_SECONDS: float = 20.0
+const SURGE_MANA_REGEN_MULT: float = 2.0
 ## Field bounds — extended slightly to give squares more runway (descent
 ## distance drives how long the player has to react per spawn). Each side
 ## gets ~315 px instead of ~270.
@@ -65,15 +69,15 @@ class BotState:
 	var favour_roles: Array = []
 	var display_name: String = ""
 
-var phase: Phase = Phase.MATCH
-var _time_left: float = MATCH_SECONDS
+var phase: Phase = Phase.SURGE
+var _time_left: float = SURGE_SECONDS
 var _player_score: int = 0
 var _enemy_score: int = 0
 var _player_gun: Gun
 var _enemy_gun: Gun
 var _deck: Array[CardData] = []
 var _selected: CardData = null
-var _mana: float = MANA_START
+var _mana: float = float(MANA_MAX)
 var _bots: Array[BotState] = []
 
 func _ready() -> void:
@@ -92,6 +96,11 @@ func _ready() -> void:
 	_spawn_guns()
 	_setup_hand()
 	_setup_bots()
+	# Kick off SURGE — full mana for everyone so the first 20 seconds are
+	# a kinetic opening rather than waiting for the pip bar to fill.
+	_mana = float(MANA_MAX)
+	for b in _bots:
+		b.mana = float(MANA_MAX)
 	_apply_hud_style()
 	_refresh_hud()
 	SfxBank.play(&"match_start")
@@ -248,7 +257,14 @@ func _gun_positions(count: int, y: float) -> Array:
 
 func _apply_hud_style() -> void:
 	phase_label.add_theme_font_override("font", Palette.FONT_DISPLAY_BOLD)
-	phase_label.add_theme_color_override("font_color", Palette.UI_CYAN)
+	# Amber during the SURGE opening, cyan once MATCH proper starts. Set
+	# here (post-_setup) so the initial state reads "SURGE" in amber right
+	# on boot without a frame of stale cyan.
+	if phase == Phase.SURGE:
+		phase_label.text = "SURGE"
+		phase_label.add_theme_color_override("font_color", Palette.UI_AMBER)
+	else:
+		phase_label.add_theme_color_override("font_color", Palette.UI_CYAN)
 	timer_label.add_theme_font_override("font", Palette.FONT_MONO_BOLD)
 	timer_label.add_theme_color_override("font_color", Palette.UI_AMBER)
 	player_score_label.add_theme_font_override("font", Palette.FONT_MONO_BOLD)
@@ -266,7 +282,9 @@ func _apply_hud_style() -> void:
 	enemy_mana_label.add_theme_font_override("font", Palette.FONT_MONO_BOLD)
 	enemy_mana_label.add_theme_color_override("font_color", Palette.UI_RED)
 	if mana_bar is ManaBar:
-		(mana_bar as ManaBar).pip_color = Palette.UI_CYAN
+		# Pips read amber during SURGE so the boosted regen is visible, then
+		# flip to cyan when _advance_phase transitions into MATCH.
+		(mana_bar as ManaBar).pip_color = Palette.UI_AMBER if phase == Phase.SURGE else Palette.UI_CYAN
 		(mana_bar as ManaBar).dim_color = Palette.UI_LINE_2
 		mana_bar.queue_redraw()
 	var exit_sb := StyleBoxFlat.new()
@@ -297,12 +315,14 @@ func _process(delta: float) -> void:
 	if phase == Phase.OVER:
 		return
 	# Mana regen — matches classic rate so deck-builders transfer feel.
-	_mana = minf(_mana + MANA_REGEN_PER_SEC * delta, float(MANA_MAX))
+	# SURGE doubles the rate so the opening window is kinetic.
+	var regen_mult: float = SURGE_MANA_REGEN_MULT if phase == Phase.SURGE else 1.0
+	_mana = minf(_mana + MANA_REGEN_PER_SEC * delta * regen_mult, float(MANA_MAX))
 	# Bot economies + deploy ticks. Aggression shortens the spawn interval
 	# and boosts regen, matching classic 1V1 pacing.
 	for b in _bots:
 		var aggro_mult: float = 0.7 + 0.6 * clampf(b.aggression, 0.0, 1.0)
-		b.mana = minf(b.mana + MANA_REGEN_PER_SEC * delta * aggro_mult, float(MANA_MAX))
+		b.mana = minf(b.mana + MANA_REGEN_PER_SEC * delta * aggro_mult * regen_mult, float(MANA_MAX))
 		b.timer += delta
 		if b.timer >= BOT_SPAWN_INTERVAL / aggro_mult:
 			b.timer = 0.0
@@ -431,7 +451,17 @@ func _check_early_win() -> void:
 			_end_match()
 
 func _advance_phase() -> void:
-	if phase == Phase.MATCH:
+	if phase == Phase.SURGE:
+		# Surge ended — enter MATCH with the remaining total time so the
+		# combined SURGE + MATCH length equals MATCH_SECONDS (95s here).
+		phase = Phase.MATCH
+		_time_left = maxf(0.0, MATCH_SECONDS - SURGE_SECONDS)
+		phase_label.text = "VOLLEY"
+		phase_label.add_theme_color_override("font_color", Palette.UI_CYAN)
+		if mana_bar is ManaBar:
+			(mana_bar as ManaBar).pip_color = Palette.UI_CYAN
+			mana_bar.queue_redraw()
+	elif phase == Phase.MATCH:
 		if _player_score == _enemy_score:
 			phase = Phase.OVERTIME
 			_time_left = OVERTIME_SECONDS

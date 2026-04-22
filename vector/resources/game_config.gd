@@ -36,6 +36,15 @@ extends Resource
 @export var mana_start: int = 6
 @export_range(0.1, 5.0, 0.05) var mana_regen_per_sec: float = 1.0
 
+@export_group("Surge phase")
+## Duration (seconds) of the SURGE opening sub-phase that fires at the
+## start of MATCH. During Surge the player enters with full mana and the
+## regen rate is multiplied — cuts the dead zone between BUILD and first
+## meaningful engagement. Set to 0 to disable Surge entirely.
+@export_range(0.0, 60.0, 0.5) var surge_seconds: float = 25.0
+## Mana regen multiplier applied during SURGE. 2.0 = double speed.
+@export_range(1.0, 5.0, 0.1) var surge_mana_regen_mult: float = 2.0
+
 @export_group("Projectiles")
 @export var projectile_speed: float = 260.0
 @export var projectile_trail_length: int = 6
